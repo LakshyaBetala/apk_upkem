@@ -1,0 +1,11 @@
+{
+  "users": [
+    { "phone": "9999999999", "store_name": "City Pharma", "is_approved": true, "credit_balance": 15000, "credit_limit": 50000 },
+    { "phone": "8888888888", "store_name": "LifeCare Meds", "is_approved": false, "credit_balance": 0, "credit_limit": 0 }
+  ],
+  "products": [
+    { "id": 1, "name": "Paracetamol 500mg (Box of 100)", "company": "GSK", "category": "Analgesics", "price": 120, "stock": 50 },
+    { "id": 2, "name": "Amoxicillin 250mg (Box of 50)", "company": "Cipla", "category": "Antibiotics", "price": 450, "stock": 20 },
+    { "id": 3, "name": "Digital BP Monitor", "company": "Omron", "category": "Devices", "price": 1500, "stock": 5 }
+  ]
+}

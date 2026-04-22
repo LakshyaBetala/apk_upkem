@@ -1,0 +1,370 @@
+{
+  "users": [
+    {
+      "phone": "9999999999",
+      "store_name": "City Pharma",
+      "is_approved": true,
+      "credit_balance": 15000,
+      "credit_limit": 50000
+    },
+    {
+      "phone": "8888888888",
+      "store_name": "LifeCare Meds",
+      "is_approved": false,
+      "credit_balance": 0,
+      "credit_limit": 0
+    },
+    {
+      "phone": "7777777777",
+      "store_name": "Global Health Pharmacy",
+      "is_approved": true,
+      "credit_balance": 45000,
+      "credit_limit": 100000
+    },
+    {
+      "phone": "6666666666",
+      "store_name": "MediQuick Supplies",
+      "is_approved": false,
+      "credit_balance": 0,
+      "credit_limit": 0
+    }
+  ],
+  "products": [
+    {
+      "id": 1,
+      "name": "Paracetamol 500mg (Box of 100)",
+      "company": "GSK",
+      "category": "Analgesics",
+      "price": 120,
+      "stock": 42
+    },
+    {
+      "id": 2,
+      "name": "Amoxicillin 250mg (Box of 50)",
+      "company": "Cipla",
+      "category": "Antibiotics",
+      "price": 450,
+      "stock": 16
+    },
+    {
+      "id": 3,
+      "name": "Digital BP Monitor",
+      "company": "Omron",
+      "category": "Devices",
+      "price": 1500,
+      "stock": 1
+    },
+    {
+      "id": 4,
+      "name": "Ibuprofen 400mg (Box of 50)",
+      "company": "Sun Pharma",
+      "category": "Analgesics",
+      "price": 180,
+      "stock": 78
+    },
+    {
+      "id": 5,
+      "name": "Vitamin C 1000mg (Bottle of 60)",
+      "company": "NatureMade",
+      "category": "Vitamins",
+      "price": 320,
+      "stock": 45
+    },
+    {
+      "id": 6,
+      "name": "Cough Syrup 100ml",
+      "company": "Pfizer",
+      "category": "Syrups",
+      "price": 95,
+      "stock": 6
+    },
+    {
+      "id": 7,
+      "name": "Cetirizine 10mg (Box of 100)",
+      "company": "Dr. Reddy's",
+      "category": "Allergy",
+      "price": 200,
+      "stock": 150
+    },
+    {
+      "id": 8,
+      "name": "Antiseptic Cream 50g",
+      "company": "Johnson & Johnson",
+      "category": "First Aid",
+      "price": 75,
+      "stock": 8
+    },
+    {
+      "id": 9,
+      "name": "Omeprazole 20mg (Box of 30)",
+      "company": "AstraZeneca",
+      "category": "Gastrointestinal",
+      "price": 280,
+      "stock": 0
+    },
+    {
+      "id": 10,
+      "name": "Metformin 500mg (Box of 100)",
+      "company": "Lupin",
+      "category": "Diabetic Care",
+      "price": 150,
+      "stock": 120
+    },
+    {
+      "id": 11,
+      "name": "Insulin Syringes (Pack of 50)",
+      "company": "BD",
+      "category": "Devices",
+      "price": 400,
+      "stock": 40
+    },
+    {
+      "id": 12,
+      "name": "Multivitamin Women (Bottle of 90)",
+      "company": "Centrum",
+      "category": "Vitamins",
+      "price": 750,
+      "stock": 25
+    },
+    {
+      "id": 13,
+      "name": "Azithromycin 500mg (Pack of 3)",
+      "company": "Pfizer",
+      "category": "Antibiotics",
+      "price": 120,
+      "stock": 200
+    },
+    {
+      "id": 14,
+      "name": "Thermometer Infrared",
+      "company": "Omron",
+      "category": "Devices",
+      "price": 2200,
+      "stock": 12
+    },
+    {
+      "id": 15,
+      "name": "Muscle Rub Ointment 30g",
+      "company": "Sun Pharma",
+      "category": "Ointments",
+      "price": 85,
+      "stock": 60
+    },
+    {
+      "id": 16,
+      "name": "Hand Sanitizer 500ml",
+      "company": "Dettol",
+      "category": "First Aid",
+      "price": 250,
+      "stock": 5
+    },
+    {
+      "id": 17,
+      "name": "Calcium + D3 Supplement (Bottle)",
+      "company": "GSK",
+      "category": "Vitamins",
+      "price": 450,
+      "stock": 15
+    },
+    {
+      "id": 18,
+      "name": "Aspirin 81mg (Box of 120)",
+      "company": "Bayer",
+      "category": "Analgesics",
+      "price": 280,
+      "stock": 90
+    },
+    {
+      "id": 19,
+      "name": "Blood Glucose Test Strips (50 ct)",
+      "company": "Accu-Chek",
+      "category": "Diabetic Care",
+      "price": 990,
+      "stock": 0
+    },
+    {
+      "id": 20,
+      "name": "Dolo650 500mg(15x10)",
+      "company": "Micro Labs",
+      "category": "General",
+      "price": 900,
+      "stock": 100
+    }
+  ],
+  "orders": [
+    {
+      "id": "ORD180477",
+      "date": "20/04/2026",
+      "items": [
+        {
+          "id": 1,
+          "name": "Paracetamol 500mg (Box of 100)",
+          "company": "GSK",
+          "category": "Analgesics",
+          "price": 120,
+          "stock": 45,
+          "quantity": 3
+        },
+        {
+          "id": 2,
+          "name": "Amoxicillin 250mg (Box of 50)",
+          "company": "Cipla",
+          "category": "Antibiotics",
+          "price": 450,
+          "stock": 19,
+          "quantity": 3
+        },
+        {
+          "id": 3,
+          "name": "Digital BP Monitor",
+          "company": "Omron",
+          "category": "Devices",
+          "price": 1500,
+          "stock": 3,
+          "quantity": 2
+        },
+        {
+          "id": 4,
+          "name": "Ibuprofen 400mg (Box of 50)",
+          "company": "Sun Pharma",
+          "category": "Analgesics",
+          "price": 180,
+          "stock": 80,
+          "quantity": 2
+        }
+      ],
+      "total": 5070,
+      "status": "Shipped"
+    },
+    {
+      "id": "ORD713106",
+      "date": "20/04/2026",
+      "items": [
+        {
+          "id": 1,
+          "name": "Paracetamol 500mg (Box of 100)",
+          "company": "GSK",
+          "category": "Analgesics",
+          "price": 120,
+          "stock": 50,
+          "quantity": 5
+        },
+        {
+          "id": 2,
+          "name": "Amoxicillin 250mg (Box of 50)",
+          "company": "Cipla",
+          "category": "Antibiotics",
+          "price": 450,
+          "stock": 20,
+          "quantity": 1
+        },
+        {
+          "id": 3,
+          "name": "Digital BP Monitor",
+          "company": "Omron",
+          "category": "Devices",
+          "price": 1500,
+          "stock": 5,
+          "quantity": 2
+        }
+      ],
+      "total": 4050,
+      "status": "Shipped"
+    },
+    {
+      "id": "ORD936799",
+      "date": "20/04/2026",
+      "items": [
+        {
+          "id": 6,
+          "name": "Cough Syrup 100ml",
+          "company": "Pfizer",
+          "category": "Syrups",
+          "price": 95,
+          "stock": 10,
+          "quantity": 4
+        },
+        {
+          "id": 19,
+          "name": "Blood Glucose Test Strips (50 ct)",
+          "company": "Accu-Chek",
+          "category": "Diabetic Care",
+          "price": 990,
+          "stock": 3,
+          "quantity": 3
+        }
+      ],
+      "total": 3350,
+      "status": "Shipped"
+    },
+    {
+      "id": "ORD712328",
+      "date": "20/04/2026",
+      "items": [
+        {
+          "id": 3,
+          "name": "Digital BP Monitor",
+          "company": "Omron",
+          "category": "Devices",
+          "price": 1500,
+          "stock": 5,
+          "quantity": 7
+        }
+      ],
+      "total": 10500,
+      "status": "Rejected"
+    },
+    {
+      "id": "ORD648605",
+      "date": "20/04/2026",
+      "items": [
+        {
+          "id": 1,
+          "name": "Paracetamol 500mg (Box of 100)",
+          "company": "GSK",
+          "category": "Analgesics",
+          "price": 120,
+          "stock": 50,
+          "quantity": 1
+        },
+        {
+          "id": 2,
+          "name": "Amoxicillin 250mg (Box of 50)",
+          "company": "Cipla",
+          "category": "Antibiotics",
+          "price": 450,
+          "stock": 20,
+          "quantity": 1
+        },
+        {
+          "id": 3,
+          "name": "Digital BP Monitor",
+          "company": "Omron",
+          "category": "Devices",
+          "price": 1500,
+          "stock": 5,
+          "quantity": 1
+        }
+      ],
+      "total": 2070,
+      "status": "Shipped"
+    },
+    {
+      "id": "ORD819353",
+      "date": "18/04/2026",
+      "items": [
+        {
+          "id": 1,
+          "name": "Paracetamol 500mg (Box of 100)",
+          "company": "GSK",
+          "category": "Analgesics",
+          "price": 120,
+          "stock": 50,
+          "quantity": 2
+        }
+      ],
+      "total": 240,
+      "status": "Shipped"
+    }
+  ]
+}
