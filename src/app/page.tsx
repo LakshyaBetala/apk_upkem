@@ -125,8 +125,8 @@ export default function Dashboard() {
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-8 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900">Medical Admin Workspace</h1>
-            <p className="text-slate-500 mt-1">Manage B2B users, credit, products, and incoming orders.</p>
+            <h1 className="text-3xl font-black tracking-tight text-slate-900">UPKEM LABS <span className="text-emerald-600 font-light text-2xl">| Command Center</span></h1>
+            <p className="text-slate-500 mt-1 font-medium">We build trust not medicine. Manage B2B users, credit lines, and incoming wholesale orders.</p>
           </div>
           <div className="relative cursor-pointer" onClick={() => setNotifications(0)}>
             <div className="p-3 bg-slate-100 rounded-full hover:bg-slate-200 transition">

@@ -1,6 +1,20 @@
 {
   "users": [
     {
+      "phone": "6383945610",
+      "store_name": "Cofounder Pharma",
+      "is_approved": true,
+      "credit_balance": 0,
+      "credit_limit": 500000
+    },
+    {
+      "phone": "8072116397",
+      "store_name": "My Pharma Store",
+      "is_approved": true,
+      "credit_balance": 0,
+      "credit_limit": 100000
+    },
+    {
       "phone": "9999999999",
       "store_name": "City Pharma",
       "is_approved": true,

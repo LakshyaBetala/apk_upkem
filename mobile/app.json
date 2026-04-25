@@ -1,0 +1,42 @@
+{
+  "expo": {
+    "name": "UPKEM LABS",
+    "slug": "upkem-labs-b2b",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/pharma_logo.jpeg",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/pharma_logo.jpeg",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.upkemlabs.b2b"
+    },
+    "android": {
+      "package": "com.upkemlabs.b2b",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/pharma_logo.jpeg",
+        "backgroundColor": "#ffffff"
+      }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "7d5de68f-77b5-46b1-af48-127447bcb46c"
+      }
+    },
+    "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
+    ]
+  }
+}
