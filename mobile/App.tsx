@@ -1,11 +1,11 @@
 // @ts-nocheck
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { enableScreens } from 'react-native-screens';
 enableScreens(false);
 import { 
   StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, 
-  BackHandler, FlatList, Image, Modal, KeyboardAvoidingView, Platform, ScrollView,
-  ActivityIndicator, LayoutAnimation, UIManager
+  FlatList, Image, Modal, KeyboardAvoidingView, Platform, ScrollView,
+  LayoutAnimation, UIManager, Animated, Easing, Keyboard, StatusBar
 } from 'react-native';
 import { create } from 'zustand';
 import Constants from 'expo-constants';
@@ -17,8 +17,44 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-// We allow the user to change this at runtime for the prototype APK demo
 const DEFAULT_IP = '192.168.1.100';
+const MIN_ORDER_VALUE = 5000;
+
+// Premium Shadow System
+const SHADOWS = {
+  sm: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
+  md: { shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.08, shadowRadius: 16, elevation: 6 },
+  lg: { shadowColor: '#000', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.12, shadowRadius: 24, elevation: 12 },
+  glowIndigo: { shadowColor: '#4f46e5', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 8 },
+  glowEmerald: { shadowColor: '#10b981', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 8 },
+};
+
+// Premium Button Component
+const AnimatedPressable = ({ onPress, style, children, disabled }) => {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () => {
+    Animated.spring(scale, { toValue: 0.95, useNativeDriver: true, speed: 20, bounciness: 5 }).start();
+  };
+  
+  const handlePressOut = () => {
+    Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 20, bounciness: 5 }).start();
+  };
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.9}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      onPress={onPress}
+      disabled={disabled}
+    >
+      <Animated.View style={[style, { transform: [{ scale }] }]}>
+        {children}
+      </Animated.View>
+    </TouchableOpacity>
+  );
+};
 
 const useStore = create((set, get) => ({
   serverIp: DEFAULT_IP,
@@ -37,13 +73,25 @@ const useStore = create((set, get) => ({
   removeFromCart: (productId) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     set((state) => {
-    const newCart = { ...state.cart };
-    if (newCart[productId] > 1) {
-      newCart[productId] -= 1;
-    } else {
-      delete newCart[productId];
-    }
-    return { cart: newCart };
+      const newCart = { ...state.cart };
+      if (newCart[productId] > 1) {
+        newCart[productId] -= 1;
+      } else {
+        delete newCart[productId];
+      }
+      return { cart: newCart };
+    });
+  },
+  setCartQuantity: (productId, qty) => {
+    set((state) => {
+      const newCart = { ...state.cart };
+      const parsedQty = parseInt(qty);
+      if (isNaN(parsedQty) || parsedQty <= 0) {
+        delete newCart[productId];
+      } else {
+        newCart[productId] = parsedQty;
+      }
+      return { cart: newCart };
     });
   },
   clearCart: () => set({ cart: {} }),
@@ -57,12 +105,11 @@ const useStore = create((set, get) => ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ collection: 'orders', item: order, action: 'create' })
       });
-    } catch(e) {
-      console.error(e);
-      Alert.alert('Error', 'Failed to connect to server. Check IP.');
+    } catch (e) {
+      Alert.alert('Connection Error', 'Failed to reach the server. Please verify the IP address.');
       return false;
     }
-    
+
     set((state) => ({
       orders: [order, ...state.orders],
       cart: {},
@@ -77,27 +124,25 @@ function LoginScreen({ setCurrentScreen }) {
   const [phone, setPhone] = useState('');
   const [showConfig, setShowConfig] = useState(false);
   const [tempIp, setTempIp] = useState('');
-  
+
   const setUser = useStore((state) => state.setUser);
   const usersList = useStore((state) => state.usersList);
   const serverIp = useStore((state) => state.serverIp);
   const setServerIp = useStore((state) => state.setServerIp);
 
-  useEffect(() => {
-    setTempIp(serverIp);
-  }, [serverIp]);
+  useEffect(() => { setTempIp(serverIp); }, [serverIp]);
 
   const handleLogin = () => {
     Haptics.selectionAsync();
     if (usersList.length === 0) {
-       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-       Alert.alert('Connection Error', 'No data loaded from server. Please configure the Server IP to point to the Next.js API.');
-       return;
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert('Network Unavailable', 'No data loaded from server. Configure IP settings.');
+      return;
     }
     const foundUser = usersList.find(u => u.phone === phone);
     if (!foundUser) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert('Error', 'Unregistered User');
+      Alert.alert('Access Denied', 'Unregistered or invalid mobile number.');
       return;
     }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -111,59 +156,68 @@ function LoginScreen({ setCurrentScreen }) {
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.loginContainer} 
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
-      <ScrollView contentContainerStyle={{flexGrow: 1}} keyboardShouldPersistTaps="handled">
+    <KeyboardAvoidingView style={styles.loginContainer} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+      <StatusBar barStyle="light-content" />
+      <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
         <View style={styles.loginHero}>
-           <Image source={require('./assets/pharma_logo.jpeg')} style={styles.loginLogo} resizeMode="contain" />
-           <Text style={styles.companyName}>UPKEM LABS</Text>
-           <Text style={styles.tagline}>We build trust not medicine</Text>
+          <View style={styles.logoContainer}>
+            <Image source={require('./assets/pharma_logo.jpeg')} style={styles.loginLogo} resizeMode="contain" />
+          </View>
+          <Text style={styles.companyName}>UPKEM LABS</Text>
+          <Text style={styles.tagline}>B2B Command Network</Text>
         </View>
-        
+
         <View style={styles.loginCard}>
-          <Text style={styles.loginTitle}>B2B Partner Portal</Text>
-          <Text style={styles.loginSubtitle}>Access wholesale catalog and manage your credit line securely.</Text>
-          
+          <View style={styles.dragHandle} />
+          <Text style={styles.loginTitle}>Secure Access</Text>
+          <Text style={styles.loginSubtitle}>Enter your registered mobile number.</Text>
+
           <View style={styles.inputWrapper}>
             <Text style={styles.inputPrefix}>+91</Text>
+            <View style={styles.inputDivider} />
             <TextInput
               style={styles.inputField}
-              placeholder="Enter 10-digit phone"
+              placeholder="00000 00000"
               placeholderTextColor="#94a3b8"
               keyboardType="phone-pad"
               value={phone}
               onChangeText={setPhone}
               maxLength={10}
+              returnKeyType="done"
             />
           </View>
-          
-          <TouchableOpacity style={styles.buttonPrimary} onPress={handleLogin}>
-            <Text style={styles.buttonPrimaryText}>Secure Login</Text>
-          </TouchableOpacity>
 
-          <TouchableOpacity style={{ marginTop: 20 }} onPress={() => setShowConfig(true)}>
-            <Text style={{ color: '#64748b', textAlign: 'center', fontWeight: 'bold' }}>⚙️ Configure Server IP</Text>
+          <AnimatedPressable style={styles.buttonPrimary} onPress={handleLogin}>
+            <Text style={styles.buttonPrimaryText}>Authenticate</Text>
+          </AnimatedPressable>
+
+          <TouchableOpacity style={{ marginTop: 32 }} onPress={() => setShowConfig(true)}>
+            <Text style={styles.configText}>NETWORK CONFIGURATION</Text>
           </TouchableOpacity>
         </View>
 
-        <Modal visible={showConfig} transparent animationType="slide">
-           <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.modalOverlay}>
-             <View style={styles.modalContent}>
-               <Text style={styles.modalTitle}>Demo Configuration</Text>
-               <Text style={{marginBottom: 10, color: '#64748b'}}>Set the local IP of the machine running Next.js</Text>
-               <TextInput style={styles.inputFieldConfig} value={tempIp} onChangeText={setTempIp} placeholder="192.168.x.x" />
-               <View style={{flexDirection: 'row', justifyContent: 'space-between', marginTop: 20}}>
-                 <TouchableOpacity onPress={() => setShowConfig(false)} style={styles.btnCancel}>
-                   <Text style={{fontWeight: 'bold'}}>Cancel</Text>
-                 </TouchableOpacity>
-                 <TouchableOpacity onPress={() => { setServerIp(tempIp); setShowConfig(false); }} style={styles.btnSave}>
-                   <Text style={{color: '#fff', fontWeight: 'bold'}}>Save IP</Text>
-                 </TouchableOpacity>
-               </View>
-             </View>
-           </KeyboardAvoidingView>
+        <Modal visible={showConfig} transparent animationType="fade">
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Network Setup</Text>
+              <Text style={{ marginBottom: 20, color: '#64748b', fontSize: 14 }}>Enter the Next.js API IPv4 address.</Text>
+              <TextInput 
+                style={styles.inputFieldConfig} 
+                value={tempIp} 
+                onChangeText={setTempIp} 
+                placeholder="192.168.x.x" 
+                keyboardType="numbers-and-punctuation"
+              />
+              <View style={{ flexDirection: 'row', gap: 12, marginTop: 24 }}>
+                <TouchableOpacity onPress={() => setShowConfig(false)} style={styles.btnCancel}>
+                  <Text style={{ fontWeight: '700', color: '#475569' }}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => { setServerIp(tempIp); setShowConfig(false); }} style={styles.btnSave}>
+                  <Text style={{ color: '#fff', fontWeight: '800' }}>Save IP</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
         </Modal>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -174,19 +228,23 @@ function LoginScreen({ setCurrentScreen }) {
 function PendingApprovalScreen() {
   return (
     <View style={styles.centeredContainer}>
+      <StatusBar barStyle="dark-content" />
       <View style={styles.pendingCard}>
-         <Text style={{fontSize: 50, marginBottom: 10, textAlign: 'center'}}>⏳</Text>
-         <Text style={styles.pendingTitle}>Under Review</Text>
-         <Text style={styles.pendingDesc}>Your UPKEM LABS wholesale profile is currently being verified by our compliance team.</Text>
+        <View style={styles.iconCircle}>
+          <Text style={{ fontSize: 32 }}>🔒</Text>
+        </View>
+        <Text style={styles.pendingTitle}>Under Review</Text>
+        <Text style={styles.pendingDesc}>Your UPKEM LABS wholesale profile is currently being verified. This process ensures network security.</Text>
       </View>
     </View>
   );
 }
 
 // --- Catalog Screen ---
-function CatalogScreen() {
+function CatalogScreen({ setCurrentScreen }) {
   const addToCart = useStore((state) => state.addToCart);
   const removeFromCart = useStore((state) => state.removeFromCart);
+  const setCartQuantity = useStore((state) => state.setCartQuantity);
   const cart = useStore((state) => state.cart);
   const productsList = useStore((state) => state.products);
   const user = useStore((state) => state.user);
@@ -194,50 +252,61 @@ function CatalogScreen() {
   const [selectedCategory, setSelectedCategory] = useState('All');
 
   const categories = ['All', ...new Set(productsList.map(p => p.category))];
-
   const filteredProducts = productsList.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.company.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
+  const totalValue = Object.keys(cart).reduce((acc, id) => {
+    const product = productsList.find(p => p.id === parseInt(id));
+    return acc + (product?.price || 0) * cart[id];
+  }, 0);
+  const isMinMet = totalValue >= MIN_ORDER_VALUE;
+  const progressPercent = Math.min((totalValue / MIN_ORDER_VALUE) * 100, 100);
+
   return (
     <View style={styles.screen}>
+      <StatusBar barStyle="dark-content" />
       <View style={styles.header}>
         <View>
-          <Text style={styles.headerTitle}>👋 Hello, {user?.store_name}</Text>
-          <Text style={styles.headerCredit}>Avail. Credit: ₹{(user?.credit_limit - user?.credit_balance).toLocaleString('en-IN')}</Text>
+          <Text style={styles.headerTitle}>{user?.store_name}</Text>
+          <Text style={styles.headerCredit}>Avail. Credit: <Text style={{color: '#0f172a'}}>₹{(user?.credit_limit - user?.credit_balance).toLocaleString('en-IN')}</Text></Text>
         </View>
         <Image source={require('./assets/pharma_logo.jpeg')} style={styles.headerLogo} />
       </View>
 
-      <FlatList 
-        contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+      <FlatList
+        contentContainerStyle={{ padding: 16, paddingBottom: 160 }}
+        keyboardShouldPersistTaps="handled"
         ListHeaderComponent={
-          <>
-            <TextInput
-              style={styles.searchInput}
-              placeholder="🔍 Search UPKEM products..."
-              placeholderTextColor="#94a3b8"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
+          <View style={{ marginBottom: 8 }}>
+            <View style={styles.searchContainer}>
+              <Text style={{ position: 'absolute', left: 16, zIndex: 2, fontSize: 16 }}>🔍</Text>
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search SKUs, Brands..."
+                placeholderTextColor="#94a3b8"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+            </View>
             <FlatList
               horizontal
               showsHorizontalScrollIndicator={false}
               data={categories}
               keyExtractor={item => item}
-              style={{ marginBottom: 16 }}
+              contentContainerStyle={{ paddingBottom: 16 }}
               renderItem={({ item }) => (
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[styles.categoryPill, selectedCategory === item && styles.categoryPillActive]}
-                  onPress={() => setSelectedCategory(item)}
+                  onPress={() => { Haptics.selectionAsync(); setSelectedCategory(item); }}
                 >
                   <Text style={[styles.categoryText, selectedCategory === item && styles.categoryTextActive]}>{item}</Text>
                 </TouchableOpacity>
               )}
             />
-          </>
+          </View>
         }
         data={filteredProducts}
         keyExtractor={item => item.id.toString()}
@@ -248,27 +317,57 @@ function CatalogScreen() {
               <Text style={styles.productDesc}>{item.company} • {item.category}</Text>
               <View style={styles.priceRow}>
                 <Text style={styles.productPrice}>₹{item.price}</Text>
-                <Text style={[styles.stockBadge, item.stock < 10 ? {color: '#ef4444'} : {}]}>
-                  {item.stock > 0 ? `Stock: ${item.stock}` : 'Out of Stock'}
-                </Text>
+                <View style={[styles.stockBadge, item.stock < 10 ? { backgroundColor: '#fee2e2' } : {}]}>
+                  <Text style={[styles.stockText, item.stock < 10 ? { color: '#dc2626' } : {}]}>
+                    {item.stock > 0 ? `${item.stock} in stock` : 'Out of Stock'}
+                  </Text>
+                </View>
               </View>
             </View>
             <View style={styles.cartAction}>
               {(!cart[item.id] || cart[item.id] === 0) ? (
-                 <TouchableOpacity style={styles.addBtn} onPress={() => addToCart(item.id)}>
-                   <Text style={styles.addBtnText}>ADD</Text>
-                 </TouchableOpacity>
+                <AnimatedPressable style={styles.addBtn} onPress={() => addToCart(item.id)}>
+                  <Text style={styles.addBtnText}>ADD</Text>
+                </AnimatedPressable>
               ) : (
-                 <View style={styles.qtyControls}>
-                   <TouchableOpacity style={styles.qtyBtn} onPress={() => removeFromCart(item.id)}><Text style={styles.qtyBtnText}>-</Text></TouchableOpacity>
-                   <Text style={styles.qtyText}>{cart[item.id]}</Text>
-                   <TouchableOpacity style={styles.qtyBtn} onPress={() => addToCart(item.id)}><Text style={styles.qtyBtnText}>+</Text></TouchableOpacity>
-                 </View>
+                <View style={styles.qtyControls}>
+                  <TouchableOpacity style={styles.qtyBtn} onPress={() => removeFromCart(item.id)}><Text style={styles.qtyBtnText}>-</Text></TouchableOpacity>
+                  <TextInput
+                    style={styles.qtyInput}
+                    keyboardType="numeric"
+                    selectTextOnFocus
+                    value={cart[item.id].toString()}
+                    onChangeText={(val) => {
+                      if (val === '') setCartQuantity(item.id, 0);
+                      else setCartQuantity(item.id, parseInt(val) || 1);
+                    }}
+                  />
+                  <TouchableOpacity style={styles.qtyBtn} onPress={() => addToCart(item.id)}><Text style={styles.qtyBtnText}>+</Text></TouchableOpacity>
+                </View>
               )}
             </View>
           </View>
         )}
       />
+
+      {Object.keys(cart).length > 0 && (
+        <AnimatedPressable 
+          style={[styles.smartCartTracker, isMinMet ? SHADOWS.glowEmerald : SHADOWS.glowIndigo]}
+          onPress={() => { Haptics.selectionAsync(); setCurrentScreen('Cart'); }}
+        >
+          <View style={{ flex: 1, marginRight: 16 }}>
+            <Text style={styles.smartCartTitle}>
+              {isMinMet ? `₹${totalValue.toLocaleString('en-IN')} Ready to Checkout` : `₹${totalValue.toLocaleString('en-IN')} / ₹${MIN_ORDER_VALUE.toLocaleString('en-IN')} Min`}
+            </Text>
+            <View style={styles.smartCartProgressBg}>
+              <View style={[styles.smartCartProgressFill, { width: `${progressPercent}%`, backgroundColor: isMinMet ? '#34d399' : '#818cf8' }]} />
+            </View>
+          </View>
+          <View style={[styles.smartCartBtn, isMinMet ? { backgroundColor: '#10b981' } : {}]}>
+            <Text style={styles.smartCartBtnText}>➔</Text>
+          </View>
+        </AnimatedPressable>
+      )}
     </View>
   );
 }
@@ -280,8 +379,10 @@ function CartScreen({ setCurrentScreen }) {
   const placeOrder = useStore((state) => state.placeOrder);
   const addToCart = useStore((state) => state.addToCart);
   const removeFromCart = useStore((state) => state.removeFromCart);
+  const setCartQuantity = useStore((state) => state.setCartQuantity);
   const user = useStore((state) => state.user);
   const [showQR, setShowQR] = useState(false);
+  const [isPlacing, setIsPlacing] = useState(false);
 
   const cartItems = Object.keys(cart).map(id => {
     const product = products.find(p => p.id === parseInt(id));
@@ -289,7 +390,7 @@ function CartScreen({ setCurrentScreen }) {
   });
 
   const totalValue = cartItems.reduce((acc, item) => acc + (item.price || 0) * item.quantity, 0);
-  const isMinMet = totalValue >= 2000;
+  const isMinMet = totalValue >= MIN_ORDER_VALUE;
 
   const handlePlaceOrder = async () => {
     Haptics.selectionAsync();
@@ -298,6 +399,8 @@ function CartScreen({ setCurrentScreen }) {
       Alert.alert("Credit Limit Exceeded", "Please settle previous invoices or contact admin.");
       return;
     }
+    
+    setIsPlacing(true);
     const newOrder = {
       id: 'UPK' + Math.floor(Math.random() * 1000000),
       date: new Date().toLocaleDateString(),
@@ -309,9 +412,11 @@ function CartScreen({ setCurrentScreen }) {
     };
 
     const success = await placeOrder(newOrder);
-    if(success) {
+    setIsPlacing(false);
+    
+    if (success) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert("Success", "Order Placed! 60-Day Credit Period Started.", [
+      Alert.alert("Order Processed", "Your wholesale order has been successfully placed. Standard 60-Day Credit Period applies.", [
         { text: "View Orders", onPress: () => setCurrentScreen('Profile') },
         { text: "Pay Now (QR)", onPress: () => setShowQR(true) }
       ]);
@@ -321,57 +426,75 @@ function CartScreen({ setCurrentScreen }) {
   if (cartItems.length === 0) {
     return (
       <View style={styles.centeredContainer}>
-        <Text style={{fontSize: 40, marginBottom: 10}}>🛒</Text>
-        <Text style={{fontSize: 20, fontWeight: 'bold', color: '#0f172a'}}>Cart is Empty</Text>
+        <View style={styles.iconCircleLg}><Text style={{ fontSize: 40 }}>🛒</Text></View>
+        <Text style={{ fontSize: 24, fontWeight: '800', color: '#0f172a', letterSpacing: -0.5 }}>Cart is Empty</Text>
+        <Text style={{ color: '#64748b', marginTop: 8, fontSize: 16 }}>Return to the catalog to add SKUs.</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.screen}>
-      <FlatList 
-        contentContainerStyle={{ padding: 16, paddingBottom: 200 }}
+      <Text style={styles.pageTitle}>Order Review</Text>
+      <FlatList
+        contentContainerStyle={{ padding: 16, paddingBottom: 220 }}
+        keyboardShouldPersistTaps="handled"
         data={cartItems}
         keyExtractor={item => item.id.toString()}
         renderItem={({ item }) => (
-          <View style={styles.cartItem}>
-             <View style={{ flex: 1 }}>
-               <Text style={styles.productName}>{item.name}</Text>
-               <Text style={styles.productPrice}>₹{item.price}</Text>
-             </View>
-             <View style={styles.qtyControls}>
-               <TouchableOpacity style={styles.qtyBtn} onPress={() => removeFromCart(item.id)}><Text style={styles.qtyBtnText}>-</Text></TouchableOpacity>
-               <Text style={styles.qtyText}>{item.quantity}</Text>
-               <TouchableOpacity style={styles.qtyBtn} onPress={() => addToCart(item.id)}><Text style={styles.qtyBtnText}>+</Text></TouchableOpacity>
-             </View>
+          <View style={styles.cartItemCard}>
+            <View style={{ flex: 1, paddingRight: 16 }}>
+              <Text style={styles.productName}>{item.name}</Text>
+              <Text style={styles.productPrice}>₹{item.price} <Text style={{color:'#94a3b8', fontSize: 13, fontWeight: '600'}}>x {item.quantity}</Text></Text>
+            </View>
+            <View style={styles.cartItemQtyControls}>
+              <TouchableOpacity style={styles.qtyBtn} onPress={() => removeFromCart(item.id)}><Text style={styles.qtyBtnText}>-</Text></TouchableOpacity>
+              <TextInput
+                style={styles.qtyInput}
+                keyboardType="numeric"
+                selectTextOnFocus
+                value={item.quantity.toString()}
+                onChangeText={(val) => {
+                  if (val === '') setCartQuantity(item.id, 0);
+                  else setCartQuantity(item.id, parseInt(val) || 1);
+                }}
+              />
+              <TouchableOpacity style={styles.qtyBtn} onPress={() => addToCart(item.id)}><Text style={styles.qtyBtnText}>+</Text></TouchableOpacity>
+            </View>
           </View>
         )}
       />
       <View style={styles.checkoutFooter}>
-         <View style={styles.billRow}>
-           <Text style={styles.billLabel}>Total Payable</Text>
-           <Text style={styles.billTotal}>₹{totalValue}</Text>
-         </View>
-         {!isMinMet && <Text style={styles.minOrderAlert}>⚠️ Minimum order value is ₹2000</Text>}
-         <TouchableOpacity 
-           style={[styles.checkoutBtn, !isMinMet && styles.checkoutBtnDisabled]} 
-           disabled={!isMinMet} onPress={handlePlaceOrder}
-         >
-           <Text style={styles.checkoutBtnText}>Checkout Order</Text>
-         </TouchableOpacity>
+        <View style={styles.billRow}>
+          <Text style={styles.billLabel}>Total Payable</Text>
+          <Text style={styles.billTotal}>₹{totalValue.toLocaleString('en-IN')}</Text>
+        </View>
+        {!isMinMet && (
+          <View style={styles.minOrderAlert}>
+            <Text style={{fontSize: 14, marginRight: 6}}>⚠️</Text>
+            <Text style={styles.minOrderAlertText}>Minimum threshold not met: ₹{MIN_ORDER_VALUE.toLocaleString('en-IN')}</Text>
+          </View>
+        )}
+        <AnimatedPressable
+          style={[styles.checkoutBtn, !isMinMet && styles.checkoutBtnDisabled, isMinMet && SHADOWS.glowIndigo]}
+          disabled={!isMinMet || isPlacing} 
+          onPress={handlePlaceOrder}
+        >
+          <Text style={styles.checkoutBtnText}>{isPlacing ? 'Processing...' : 'Place Wholesale Order'}</Text>
+        </AnimatedPressable>
       </View>
 
-      <Modal visible={showQR} transparent animationType="slide">
-         <View style={styles.modalOverlay}>
-           <View style={styles.modalContent}>
-             <Text style={styles.modalTitle}>Manual Payment</Text>
-             <Image source={{uri: 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=UPKEM-LABS-PAYMENT'}} style={{width: 200, height: 200, marginVertical: 20, alignSelf: 'center'}} />
-             <Text style={{textAlign: 'center', color: '#64748b', marginBottom: 20}}>Scan to pay UPKEM LABS</Text>
-             <TouchableOpacity onPress={() => setShowQR(false)} style={styles.btnSave}>
-               <Text style={{color: '#fff', fontWeight: 'bold', textAlign: 'center'}}>Done</Text>
-             </TouchableOpacity>
-           </View>
-         </View>
+      <Modal visible={showQR} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Manual Settlement</Text>
+            <Image source={{ uri: 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=UPKEM-LABS-PAYMENT' }} style={{ width: 200, height: 200, marginVertical: 32, alignSelf: 'center', borderRadius: 16 }} />
+            <Text style={{ textAlign: 'center', color: '#64748b', marginBottom: 32, lineHeight: 22, fontSize: 15 }}>Scan using any UPI application to settle your invoice immediately.</Text>
+            <AnimatedPressable onPress={() => setShowQR(false)} style={styles.btnSave}>
+              <Text style={{ color: '#fff', fontWeight: '800', textAlign: 'center', fontSize: 16 }}>Complete</Text>
+            </AnimatedPressable>
+          </View>
+        </View>
       </Modal>
     </View>
   );
@@ -387,69 +510,81 @@ function ProfileScreen() {
       <html>
         <head>
           <style>
-            body { font-family: 'Helvetica', sans-serif; padding: 40px; color: #0f172a; }
-            h1 { color: #059669; }
-            .header { border-bottom: 2px solid #e2e8f0; padding-bottom: 20px; margin-bottom: 20px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            th, td { border: 1px solid #e2e8f0; padding: 12px; text-align: left; }
-            th { background: #f8fafc; }
-            .total { text-align: right; font-size: 24px; font-weight: bold; margin-top: 20px; }
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; padding: 40px; color: #0f172a; }
+            h1 { color: #1e293b; margin-bottom: 0; font-size: 32px; letter-spacing: -1px; }
+            .header { border-bottom: 2px solid #f1f5f9; padding-bottom: 24px; margin-bottom: 32px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 24px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
+            th, td { border-bottom: 1px solid #f1f5f9; padding: 16px 20px; text-align: left; }
+            th { background: #f8fafc; font-weight: 700; color: #475569; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; }
+            .total { text-align: right; font-size: 28px; font-weight: 900; margin-top: 32px; color: #0f172a; letter-spacing: -0.5px; }
+            .tagline { color: #4f46e5; font-weight: 700; margin-top: 4px; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; }
+            .meta { color: #64748b; font-size: 14px; margin-top: 12px; line-height: 1.6; }
           </style>
         </head>
         <body>
           <div class="header">
             <h1>UPKEM LABS</h1>
-            <p><strong>Tagline:</strong> We build trust not medicine</p>
-            <h2>TAX INVOICE</h2>
-            <p><strong>Order ID:</strong> ${order.id}</p>
-            <p><strong>Date:</strong> ${order.date}</p>
-            <p><strong>Billed To:</strong> ${user.store_name} (+91 ${user.phone})</p>
+            <p class="tagline">Commercial Tax Invoice</p>
+            <div class="meta" style="margin-top: 32px;">
+              <p><strong>Order Ref:</strong> ${order.id}</p>
+              <p><strong>Generated On:</strong> ${order.date}</p>
+              <p><strong>Billed To:</strong> ${user.store_name} (+91 ${user.phone})</p>
+            </div>
           </div>
           <table>
-            <tr><th>Item</th><th>Qty</th><th>Price</th><th>Amount</th></tr>
-            ${order.items.map(i => `<tr><td>${i.name}</td><td>${i.quantity}</td><td>₹${i.price}</td><td>₹${i.price * i.quantity}</td></tr>`).join('')}
+            <tr><th>Description</th><th>Qty</th><th>Unit Price</th><th>Amount</th></tr>
+            ${order.items.map(i => `<tr><td><strong style="color: #0f172a;">${i.name}</strong></td><td>${i.quantity}</td><td>₹${i.price}</td><td><strong style="color: #0f172a;">₹${i.price * i.quantity}</strong></td></tr>`).join('')}
           </table>
-          <div class="total">Total Payable: ₹${order.total}</div>
-          <p style="margin-top: 50px; font-size: 12px; color: #64748b;">Terms: Payment due strictly within 60 days of dispatch. Late payments may incur penalties.</p>
+          <div class="total">Net Payable: ₹${order.total.toLocaleString('en-IN')}</div>
+          <p style="margin-top: 60px; font-size: 12px; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 16px;">
+            Terms: Payment due strictly within 60 days of dispatch. Late payments may incur penalties. Digital copy.
+          </p>
         </body>
       </html>
     `;
     try {
       const { uri } = await Print.printToFileAsync({ html });
       await Sharing.shareAsync(uri, { UTI: '.pdf', mimeType: 'application/pdf' });
-    } catch(err) {
-      console.log(err);
+    } catch (err) {
       Alert.alert('Error', 'Could not generate invoice.');
     }
   };
 
-  const utilization = (user.credit_balance / user.credit_limit) * 100;
+  const utilization = user.credit_limit > 0 ? (user.credit_balance / user.credit_limit) * 100 : 0;
 
   return (
     <View style={styles.screen}>
+      <Text style={styles.pageTitle}>Business Profile</Text>
       <FlatList
         contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
         ListHeaderComponent={
           <>
             <View style={styles.profileHeader}>
-              <View style={styles.avatar}><Text style={{fontSize: 30, color: '#fff'}}>{user.store_name[0]}</Text></View>
+              <View style={[styles.avatar, SHADOWS.glowIndigo]}>
+                <Text style={{ fontSize: 36, color: '#fff', fontWeight: '900' }}>{user.store_name[0]}</Text>
+              </View>
               <Text style={styles.profileName}>{user.store_name}</Text>
               <Text style={styles.profilePhone}>+91 {user.phone}</Text>
             </View>
 
-            <View style={styles.creditCard}>
+            <View style={[styles.creditCard, SHADOWS.lg]}>
               <Text style={styles.creditTitle}>UPKEM CREDIT LINE</Text>
               <View style={styles.creditStats}>
                 <View>
                   <Text style={styles.creditLabel}>Utilized</Text>
                   <Text style={styles.creditValue}>₹{user.credit_balance.toLocaleString('en-IN')}</Text>
                 </View>
-                <View style={{alignItems: 'flex-end'}}>
+                <View style={{ alignItems: 'flex-end' }}>
                   <Text style={styles.creditLabel}>Total Limit</Text>
                   <Text style={styles.creditValue}>₹{user.credit_limit.toLocaleString('en-IN')}</Text>
                 </View>
               </View>
-              <View style={styles.progressBar}><View style={[styles.progressFill, {width: `${Math.min(utilization, 100)}%`}]} /></View>
+              <View style={styles.progressBar}>
+                <View style={[styles.progressFill, { width: `${Math.min(utilization, 100)}%` }]} />
+              </View>
+              <Text style={{color: '#94a3b8', fontSize: 13, marginTop: 16, textAlign: 'right', fontWeight: '600'}}>
+                {(user.credit_limit - user.credit_balance).toLocaleString('en-IN')} Available
+              </Text>
             </View>
 
             <Text style={styles.sectionTitle}>Order History</Text>
@@ -461,16 +596,27 @@ function ProfileScreen() {
           <View style={styles.orderCard}>
             <View style={styles.orderHeader}>
               <Text style={styles.orderId}>{item.id}</Text>
-              <Text style={styles.orderStatus}>{item.status}</Text>
+              <View style={[styles.statusBadge, { backgroundColor: item.status === 'Rejected' ? '#fee2e2' : item.status === 'Shipped' ? '#ecfdf5' : '#f1f5f9' }]}>
+                <Text style={[styles.statusText, { color: item.status === 'Rejected' ? '#dc2626' : item.status === 'Shipped' ? '#059669' : '#0f172a' }]}>{item.status}</Text>
+              </View>
             </View>
-            <Text style={styles.orderDate}>{item.date} • ₹{item.total}</Text>
+            <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20}}>
+              <Text style={styles.orderDate}>{item.date}</Text>
+              <Text style={styles.orderTotal}>₹{item.total.toLocaleString('en-IN')}</Text>
+            </View>
             {item.status !== 'Rejected' && (
-               <TouchableOpacity style={styles.invoiceBtn} onPress={() => generateInvoice(item)}>
-                 <Text style={styles.invoiceBtnText}>📄 PDF Invoice</Text>
-               </TouchableOpacity>
+              <AnimatedPressable style={styles.invoiceBtn} onPress={() => generateInvoice(item)}>
+                <Text style={styles.invoiceBtnText}>📄 Download Tax Invoice</Text>
+              </AnimatedPressable>
             )}
           </View>
         )}
+        ListEmptyComponent={
+          <View style={{alignItems: 'center', marginTop: 40}}>
+            <Text style={{fontSize: 32, marginBottom: 12}}>📜</Text>
+            <Text style={{color: '#64748b', fontSize: 16, fontWeight: '500'}}>No previous orders found.</Text>
+          </View>
+        }
       />
     </View>
   );
@@ -479,6 +625,7 @@ function ProfileScreen() {
 // --- App Root ---
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState('Login');
+  
   const fetchAPI = async () => {
     try {
       const url = useStore.getState().getApiUrl();
@@ -487,17 +634,17 @@ export default function App() {
       const db = await res.json();
       useStore.getState().setProducts(db.products || []);
       useStore.getState().setUsersList(db.users || []);
-      // Filter orders relevant to current logged in user
+      
       const currUser = useStore.getState().user;
       if (currUser) {
-         const userOrders = db.orders.filter(o => o.phone === currUser.phone || o.store === currUser.store_name);
-         useStore.getState().setOrders(userOrders);
-         const liveUser = db.users.find(u => u.phone === currUser.phone);
-         if (liveUser && JSON.stringify(liveUser) !== JSON.stringify(currUser)) {
-           useStore.getState().setUser(liveUser);
-         }
+        const userOrders = db.orders.filter(o => o.phone === currUser.phone || o.store === currUser.store_name);
+        useStore.getState().setOrders(userOrders);
+        const liveUser = db.users.find(u => u.phone === currUser.phone);
+        if (liveUser && JSON.stringify(liveUser) !== JSON.stringify(currUser)) {
+          useStore.getState().setUser(liveUser);
+        }
       }
-    } catch(e) {
+    } catch (e) {
       // Quiet fail for polling
     }
   };
@@ -513,20 +660,28 @@ export default function App() {
     if (currentScreen === 'PendingApproval') return <PendingApprovalScreen />;
     return (
       <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
-        <View style={{ flex: 1, paddingTop: 40 }}>
-          {currentScreen === 'Catalog' && <CatalogScreen />}
+        <View style={{ flex: 1, paddingTop: Constants.statusBarHeight || 48 }}>
+          {currentScreen === 'Catalog' && <CatalogScreen setCurrentScreen={setCurrentScreen} />}
           {currentScreen === 'Cart' && <CartScreen setCurrentScreen={setCurrentScreen} />}
           {currentScreen === 'Profile' && <ProfileScreen />}
         </View>
-        <View style={styles.tabBar}>
-          <TouchableOpacity style={styles.tabItem} onPress={() => { Haptics.selectionAsync(); LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setCurrentScreen('Catalog'); }}>
-            <Text style={[styles.tabText, currentScreen === 'Catalog' && styles.tabTextActive]}>📦 Catalog</Text>
+        <View style={[styles.tabBar, SHADOWS.lg]}>
+          <TouchableOpacity style={styles.tabItem} onPress={() => { Haptics.selectionAsync(); setCurrentScreen('Catalog'); }}>
+            <Text style={{fontSize: 22, marginBottom: 4, opacity: currentScreen === 'Catalog' ? 1 : 0.5}}>📦</Text>
+            <Text style={[styles.tabText, currentScreen === 'Catalog' && styles.tabTextActive]}>Catalog</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.tabItem} onPress={() => { Haptics.selectionAsync(); LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setCurrentScreen('Cart'); }}>
-            <Text style={[styles.tabText, currentScreen === 'Cart' && styles.tabTextActive]}>🛒 Cart</Text>
+          <TouchableOpacity style={styles.tabItem} onPress={() => { Haptics.selectionAsync(); setCurrentScreen('Cart'); }}>
+            <View>
+              <Text style={{fontSize: 22, marginBottom: 4, opacity: currentScreen === 'Cart' ? 1 : 0.5}}>🛒</Text>
+              {Object.keys(useStore.getState().cart).length > 0 && (
+                <View style={styles.cartBadge} />
+              )}
+            </View>
+            <Text style={[styles.tabText, currentScreen === 'Cart' && styles.tabTextActive]}>Cart</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.tabItem} onPress={() => { Haptics.selectionAsync(); LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setCurrentScreen('Profile'); }}>
-            <Text style={[styles.tabText, currentScreen === 'Profile' && styles.tabTextActive]}>👤 Profile</Text>
+          <TouchableOpacity style={styles.tabItem} onPress={() => { Haptics.selectionAsync(); setCurrentScreen('Profile'); }}>
+            <Text style={{fontSize: 22, marginBottom: 4, opacity: currentScreen === 'Profile' ? 1 : 0.5}}>👤</Text>
+            <Text style={[styles.tabText, currentScreen === 'Profile' && styles.tabTextActive]}>Profile</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -536,99 +691,127 @@ export default function App() {
   return <View style={{ flex: 1 }}>{renderScreen()}</View>;
 }
 
-// --- Styles ---
+// --- High-End Styles ---
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#f8fafc' },
-  centeredContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f8fafc' },
+  centeredContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f8fafc', padding: 24 },
+  pageTitle: { fontSize: 32, fontWeight: '900', color: '#0f172a', paddingHorizontal: 16, paddingBottom: 16, paddingTop: 8, letterSpacing: -1 },
   
   // Login
-  loginContainer: { flex: 1, backgroundColor: '#0f172a' },
-  loginHero: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
-  loginLogo: { width: 120, height: 120, borderRadius: 20, marginBottom: 20 },
-  companyName: { color: '#fff', fontSize: 32, fontWeight: '900', letterSpacing: 2 },
-  tagline: { color: '#10b981', fontSize: 16, marginTop: 8, fontStyle: 'italic' },
-  loginCard: { backgroundColor: '#fff', borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 30, paddingBottom: 50 },
-  loginTitle: { fontSize: 24, fontWeight: 'bold', color: '#0f172a', marginBottom: 8 },
-  loginSubtitle: { fontSize: 14, color: '#64748b', marginBottom: 24 },
-  inputWrapper: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 16, marginBottom: 24, backgroundColor: '#f8fafc' },
-  inputPrefix: { fontSize: 16, fontWeight: 'bold', color: '#0f172a', marginRight: 10 },
-  inputField: { flex: 1, paddingVertical: 16, fontSize: 16, color: '#0f172a' },
-  buttonPrimary: { backgroundColor: '#059669', paddingVertical: 16, borderRadius: 12, alignItems: 'center' },
-  buttonPrimaryText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  loginContainer: { flex: 1, backgroundColor: '#020617' }, // Very deep background
+  loginHero: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, paddingTop: 60 },
+  logoContainer: { padding: 4, backgroundColor: '#fff', borderRadius: 28, marginBottom: 24, ...SHADOWS.glowIndigo },
+  loginLogo: { width: 90, height: 90, borderRadius: 24 },
+  companyName: { color: '#ffffff', fontSize: 36, fontWeight: '900', letterSpacing: -0.5 },
+  tagline: { color: '#64748b', fontSize: 16, marginTop: 8, fontWeight: '600', letterSpacing: 2, textTransform: 'uppercase' },
+  loginCard: { backgroundColor: '#ffffff', borderTopLeftRadius: 40, borderTopRightRadius: 40, padding: 32, paddingBottom: 60, ...SHADOWS.lg },
+  dragHandle: { width: 40, height: 5, backgroundColor: '#e2e8f0', borderRadius: 3, alignSelf: 'center', marginBottom: 32 },
+  loginTitle: { fontSize: 32, fontWeight: '900', color: '#0f172a', marginBottom: 8, letterSpacing: -1 },
+  loginSubtitle: { fontSize: 16, color: '#64748b', marginBottom: 40, fontWeight: '500' },
+  inputWrapper: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: '#e2e8f0', borderRadius: 20, paddingHorizontal: 20, marginBottom: 24, backgroundColor: '#f8fafc' },
+  inputPrefix: { fontSize: 18, fontWeight: '800', color: '#0f172a' },
+  inputDivider: { width: 1.5, height: 24, backgroundColor: '#e2e8f0', marginHorizontal: 16 },
+  inputField: { flex: 1, paddingVertical: 20, fontSize: 18, color: '#0f172a', fontWeight: '700', letterSpacing: 1 },
+  buttonPrimary: { backgroundColor: '#4f46e5', paddingVertical: 20, borderRadius: 20, alignItems: 'center', ...SHADOWS.glowIndigo },
+  buttonPrimaryText: { color: '#ffffff', fontSize: 18, fontWeight: '800', letterSpacing: 0.5 },
+  configText: { color: '#64748b', textAlign: 'center', fontWeight: '700', fontSize: 13, letterSpacing: 1 },
 
-  // Modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 },
-  modalContent: { backgroundColor: '#fff', borderRadius: 16, padding: 24 },
-  modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 10, color: '#0f172a' },
-  inputFieldConfig: { borderWidth: 1, borderColor: '#cbd5e1', padding: 12, borderRadius: 8, fontSize: 16 },
-  btnCancel: { padding: 12, borderRadius: 8, backgroundColor: '#e2e8f0', flex: 1, marginRight: 10, alignItems: 'center' },
-  btnSave: { padding: 12, borderRadius: 8, backgroundColor: '#059669', flex: 1, alignItems: 'center' },
+  // Modals
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(2, 6, 23, 0.7)', justifyContent: 'center', padding: 24 },
+  modalContent: { backgroundColor: '#ffffff', borderRadius: 32, padding: 32, ...SHADOWS.lg },
+  modalTitle: { fontSize: 24, fontWeight: '900', marginBottom: 8, color: '#0f172a', letterSpacing: -0.5 },
+  inputFieldConfig: { borderWidth: 1.5, borderColor: '#e2e8f0', padding: 20, borderRadius: 16, fontSize: 16, backgroundColor: '#f8fafc', color: '#0f172a', fontWeight: '600' },
+  btnCancel: { padding: 18, borderRadius: 16, backgroundColor: '#f1f5f9', flex: 1, alignItems: 'center' },
+  btnSave: { padding: 18, borderRadius: 16, backgroundColor: '#0f172a', flex: 1, alignItems: 'center', ...SHADOWS.md },
 
   // Pending
-  pendingCard: { backgroundColor: '#fff', padding: 30, borderRadius: 20, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 10, elevation: 5, marginHorizontal: 20 },
-  pendingTitle: { fontSize: 24, fontWeight: 'bold', color: '#0f172a', textAlign: 'center', marginBottom: 10 },
-  pendingDesc: { fontSize: 15, color: '#64748b', textAlign: 'center', lineHeight: 22 },
+  iconCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#f1f5f9', justifyContent: 'center', alignItems: 'center', marginBottom: 24 },
+  iconCircleLg: { width: 100, height: 100, borderRadius: 50, backgroundColor: '#f1f5f9', justifyContent: 'center', alignItems: 'center', marginBottom: 24 },
+  pendingCard: { backgroundColor: '#ffffff', padding: 40, borderRadius: 32, alignItems: 'center', ...SHADOWS.md, width: '100%' },
+  pendingTitle: { fontSize: 28, fontWeight: '900', color: '#0f172a', textAlign: 'center', marginBottom: 16, letterSpacing: -1 },
+  pendingDesc: { fontSize: 16, color: '#64748b', textAlign: 'center', lineHeight: 24, fontWeight: '500' },
 
-  // Catalog
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 10 },
-  headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#0f172a' },
-  headerCredit: { fontSize: 14, color: '#059669', fontWeight: 'bold', marginTop: 4 },
-  headerLogo: { width: 45, height: 45, borderRadius: 10 },
-  searchInput: { backgroundColor: '#fff', padding: 14, borderRadius: 12, fontSize: 16, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 16 },
-  categoryPill: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#e2e8f0', marginRight: 8 },
-  categoryPillActive: { backgroundColor: '#0f172a' },
-  categoryText: { color: '#64748b', fontWeight: '600' },
-  categoryTextActive: { color: '#fff' },
-  productCard: { backgroundColor: '#fff', padding: 16, borderRadius: 16, marginBottom: 12, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#f1f5f9', shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
-  productInfo: { flex: 1 },
-  productName: { fontSize: 16, fontWeight: 'bold', color: '#0f172a', marginBottom: 4 },
-  productDesc: { fontSize: 13, color: '#64748b', marginBottom: 8 },
-  priceRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  productPrice: { fontSize: 16, fontWeight: 'bold', color: '#059669' },
-  stockBadge: { fontSize: 12, color: '#10b981', fontWeight: 'bold' },
-  cartAction: { marginLeft: 16 },
-  addBtn: { backgroundColor: '#ecfdf5', borderColor: '#059669', borderWidth: 1, paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8 },
-  addBtnText: { color: '#059669', fontWeight: 'bold' },
-  qtyControls: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0f172a', borderRadius: 8 },
-  qtyBtn: { padding: 10, width: 36, alignItems: 'center' },
-  qtyBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 18 },
-  qtyText: { color: '#fff', fontWeight: 'bold', minWidth: 20, textAlign: 'center' },
+  // Catalog Header
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 16, paddingTop: 8 },
+  headerTitle: { fontSize: 24, fontWeight: '900', color: '#0f172a', letterSpacing: -0.5 },
+  headerCredit: { fontSize: 14, color: '#059669', fontWeight: '700', marginTop: 4 },
+  headerLogo: { width: 48, height: 48, borderRadius: 16, ...SHADOWS.sm },
+  
+  // Search & Categories
+  searchContainer: { position: 'relative', justifyContent: 'center' },
+  searchInput: { backgroundColor: '#ffffff', padding: 18, paddingLeft: 48, borderRadius: 20, fontSize: 16, borderWidth: 1, borderColor: '#f1f5f9', color: '#0f172a', fontWeight: '600', ...SHADOWS.sm },
+  categoryPill: { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 24, backgroundColor: '#ffffff', marginRight: 12, borderWidth: 1, borderColor: '#f1f5f9', ...SHADOWS.sm },
+  categoryPillActive: { backgroundColor: '#0f172a', borderColor: '#0f172a' },
+  categoryText: { color: '#64748b', fontWeight: '700', fontSize: 14 },
+  categoryTextActive: { color: '#ffffff' },
+  
+  // Products
+  productCard: { backgroundColor: '#ffffff', padding: 20, borderRadius: 24, marginBottom: 16, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#f1f5f9', ...SHADOWS.sm },
+  productInfo: { flex: 1, paddingRight: 16 },
+  productName: { fontSize: 17, fontWeight: '800', color: '#0f172a', marginBottom: 6, lineHeight: 22, letterSpacing: -0.5 },
+  productDesc: { fontSize: 13, color: '#64748b', marginBottom: 12, fontWeight: '600' },
+  priceRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  productPrice: { fontSize: 18, fontWeight: '900', color: '#059669' },
+  stockBadge: { backgroundColor: '#f1f5f9', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  stockText: { fontSize: 11, color: '#475569', fontWeight: '700' },
+  cartAction: { width: 110, alignItems: 'flex-end' },
+  addBtn: { backgroundColor: '#f8fafc', borderColor: '#e2e8f0', borderWidth: 1.5, paddingVertical: 12, width: '100%', borderRadius: 16, alignItems: 'center' },
+  addBtnText: { color: '#0f172a', fontWeight: '900', fontSize: 14 },
+  
+  // Qty Controls
+  qtyControls: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', borderRadius: 16, borderWidth: 1, borderColor: '#e2e8f0', width: '100%', overflow: 'hidden' },
+  qtyBtn: { paddingVertical: 12, flex: 1, alignItems: 'center', backgroundColor: '#f1f5f9' },
+  qtyBtnText: { color: '#0f172a', fontWeight: '900', fontSize: 18 },
+  qtyInput: { color: '#0f172a', fontWeight: '900', flex: 1.2, textAlign: 'center', fontSize: 16, paddingVertical: 8, backgroundColor: '#ffffff' },
+  cartItemQtyControls: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', borderRadius: 16, borderWidth: 1, borderColor: '#e2e8f0', width: 120, overflow: 'hidden' },
+  
+  // Smart Cart Tracker
+  smartCartTracker: { position: 'absolute', bottom: 100, left: 16, right: 16, backgroundColor: '#0f172a', padding: 20, flexDirection: 'row', alignItems: 'center', borderRadius: 24 },
+  smartCartTitle: { color: '#ffffff', fontWeight: '800', fontSize: 15, marginBottom: 12, letterSpacing: -0.5 },
+  smartCartProgressBg: { height: 8, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 4, overflow: 'hidden', width: '100%' },
+  smartCartProgressFill: { height: '100%', borderRadius: 4 },
+  smartCartBtn: { backgroundColor: '#4f46e5', width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center' },
+  smartCartBtnText: { color: '#ffffff', fontWeight: '900', fontSize: 20 },
 
   // Cart
-  cartItem: { backgroundColor: '#fff', padding: 16, borderRadius: 12, marginBottom: 10, flexDirection: 'row', alignItems: 'center' },
-  checkoutFooter: { position: 'absolute', bottom: 80, left: 0, right: 0, backgroundColor: '#fff', padding: 20, borderTopWidth: 1, borderTopColor: '#e2e8f0' },
-  billRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
-  billLabel: { fontSize: 16, color: '#64748b' },
-  billTotal: { fontSize: 24, fontWeight: 'bold', color: '#0f172a' },
-  minOrderAlert: { color: '#ef4444', fontSize: 13, fontWeight: 'bold', textAlign: 'center', marginBottom: 10 },
-  checkoutBtn: { backgroundColor: '#059669', padding: 16, borderRadius: 12, alignItems: 'center' },
-  checkoutBtnDisabled: { backgroundColor: '#94a3b8' },
-  checkoutBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  cartItemCard: { backgroundColor: '#ffffff', padding: 20, borderRadius: 24, marginBottom: 16, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#f1f5f9', ...SHADOWS.sm },
+  checkoutFooter: { position: 'absolute', bottom: 85, left: 0, right: 0, backgroundColor: '#ffffff', padding: 24, paddingBottom: 32, borderTopWidth: 1, borderTopColor: '#f1f5f9', ...SHADOWS.lg },
+  billRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20, alignItems: 'center' },
+  billLabel: { fontSize: 16, color: '#64748b', fontWeight: '700' },
+  billTotal: { fontSize: 32, fontWeight: '900', color: '#0f172a', letterSpacing: -1 },
+  minOrderAlert: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fef2f2', padding: 12, borderRadius: 12, marginBottom: 16 },
+  minOrderAlertText: { color: '#ef4444', fontSize: 14, fontWeight: '800' },
+  checkoutBtn: { backgroundColor: '#4f46e5', padding: 20, borderRadius: 20, alignItems: 'center' },
+  checkoutBtnDisabled: { backgroundColor: '#e2e8f0' },
+  checkoutBtnText: { color: '#ffffff', fontSize: 18, fontWeight: '900', letterSpacing: 0.5 },
 
   // Profile
-  profileHeader: { alignItems: 'center', marginBottom: 24 },
-  avatar: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#059669', justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
-  profileName: { fontSize: 22, fontWeight: 'bold', color: '#0f172a' },
-  profilePhone: { fontSize: 16, color: '#64748b' },
-  creditCard: { backgroundColor: '#0f172a', padding: 20, borderRadius: 16, marginBottom: 24 },
-  creditTitle: { color: '#94a3b8', fontSize: 12, fontWeight: 'bold', letterSpacing: 1, marginBottom: 16 },
-  creditStats: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
-  creditLabel: { color: '#94a3b8', fontSize: 12, marginBottom: 4 },
-  creditValue: { color: '#fff', fontSize: 20, fontWeight: 'bold' },
-  progressBar: { height: 6, backgroundColor: '#334155', borderRadius: 3, overflow: 'hidden' },
-  progressFill: { height: '100%', backgroundColor: '#10b981' },
-  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#0f172a', marginBottom: 12 },
-  orderCard: { backgroundColor: '#fff', padding: 16, borderRadius: 12, marginBottom: 10, borderWidth: 1, borderColor: '#e2e8f0' },
-  orderHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  orderId: { fontWeight: 'bold', color: '#0f172a' },
-  orderStatus: { color: '#3b82f6', fontWeight: 'bold', fontSize: 12 },
-  orderDate: { color: '#64748b', fontSize: 13, marginBottom: 12 },
-  invoiceBtn: { backgroundColor: '#f8fafc', padding: 10, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0' },
-  invoiceBtnText: { color: '#0f172a', fontWeight: '600' },
+  profileHeader: { alignItems: 'center', marginBottom: 32 },
+  avatar: { width: 96, height: 96, borderRadius: 48, backgroundColor: '#4f46e5', justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
+  profileName: { fontSize: 28, fontWeight: '900', color: '#0f172a', letterSpacing: -1 },
+  profilePhone: { fontSize: 16, color: '#64748b', fontWeight: '600', marginTop: 4 },
+  creditCard: { backgroundColor: '#0f172a', padding: 28, borderRadius: 32, marginBottom: 40 },
+  creditTitle: { color: '#94a3b8', fontSize: 12, fontWeight: '800', letterSpacing: 2, marginBottom: 24, textTransform: 'uppercase' },
+  creditStats: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24 },
+  creditLabel: { color: '#64748b', fontSize: 14, marginBottom: 8, fontWeight: '600' },
+  creditValue: { color: '#ffffff', fontSize: 26, fontWeight: '900', letterSpacing: -1 },
+  progressBar: { height: 10, backgroundColor: '#1e293b', borderRadius: 5, overflow: 'hidden' },
+  progressFill: { height: '100%', backgroundColor: '#10b981', borderRadius: 5 },
+  sectionTitle: { fontSize: 22, fontWeight: '900', color: '#0f172a', marginBottom: 20, letterSpacing: -0.5 },
+  orderCard: { backgroundColor: '#ffffff', padding: 24, borderRadius: 24, marginBottom: 16, borderWidth: 1, borderColor: '#f1f5f9', ...SHADOWS.sm },
+  orderHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16, alignItems: 'center' },
+  orderId: { fontWeight: '900', color: '#0f172a', fontSize: 16 },
+  statusBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 },
+  statusText: { fontWeight: '800', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
+  orderDate: { color: '#64748b', fontSize: 14, fontWeight: '600' },
+  orderTotal: { color: '#0f172a', fontSize: 18, fontWeight: '900' },
+  invoiceBtn: { backgroundColor: '#f8fafc', padding: 16, borderRadius: 16, alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0' },
+  invoiceBtnText: { color: '#4f46e5', fontWeight: '800', fontSize: 14 },
 
   // Tabs
-  tabBar: { flexDirection: 'row', backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#e2e8f0', paddingBottom: 20, paddingTop: 10, position: 'absolute', bottom: 0, left: 0, right: 0 },
-  tabItem: { flex: 1, alignItems: 'center' },
-  tabText: { color: '#94a3b8', fontWeight: '600', fontSize: 12 },
-  tabTextActive: { color: '#059669', fontWeight: 'bold' }
+  tabBar: { flexDirection: 'row', backgroundColor: '#ffffff', paddingBottom: Platform.OS === 'ios' ? 32 : 20, paddingTop: 16, position: 'absolute', bottom: 0, left: 0, right: 0 },
+  tabItem: { flex: 1, alignItems: 'center', position: 'relative' },
+  tabText: { color: '#94a3b8', fontWeight: '700', fontSize: 12, marginTop: 4 },
+  tabTextActive: { color: '#0f172a', fontWeight: '900' },
+  cartBadge: { position: 'absolute', top: -4, right: -8, width: 12, height: 12, backgroundColor: '#ef4444', borderRadius: 6, borderWidth: 2, borderColor: '#fff' }
 });
