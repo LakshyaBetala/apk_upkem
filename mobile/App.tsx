@@ -27,6 +27,7 @@ const SHADOWS = {
   lg: { shadowColor: '#000', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.12, shadowRadius: 24, elevation: 12 },
   glowIndigo: { shadowColor: '#4f46e5', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 8 },
   glowEmerald: { shadowColor: '#10b981', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 8 },
+  glowRed: { shadowColor: '#ef4444', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 8 }
 };
 
 // Premium Button Component
@@ -148,7 +149,7 @@ function LoginScreen({ setCurrentScreen }) {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setUser(foundUser);
-    if (foundUser.phone === '8888888888' || foundUser.is_approved === false) {
+    if (foundUser.is_approved === 0 || foundUser.is_approved === false) {
       setCurrentScreen('PendingApproval');
     } else {
       setCurrentScreen('Catalog');
@@ -225,7 +226,14 @@ function LoginScreen({ setCurrentScreen }) {
 }
 
 // --- Pending Approval ---
-function PendingApprovalScreen() {
+function PendingApprovalScreen({ setCurrentScreen }) {
+  const setUser = useStore((state) => state.setUser);
+  
+  const handleLogout = () => {
+    setUser(null);
+    setCurrentScreen('Login');
+  };
+
   return (
     <View style={styles.centeredContainer}>
       <StatusBar barStyle="dark-content" />
@@ -235,6 +243,9 @@ function PendingApprovalScreen() {
         </View>
         <Text style={styles.pendingTitle}>Under Review</Text>
         <Text style={styles.pendingDesc}>Your UPKEM LABS wholesale profile is currently being verified. This process ensures network security.</Text>
+        <AnimatedPressable style={[styles.buttonPrimary, { marginTop: 32, width: '100%', backgroundColor: '#0f172a' }]} onPress={handleLogout}>
+          <Text style={styles.buttonPrimaryText}>Return to Login</Text>
+        </AnimatedPressable>
       </View>
     </View>
   );
@@ -249,13 +260,23 @@ function CatalogScreen({ setCurrentScreen }) {
   const productsList = useStore((state) => state.products);
   const user = useStore((state) => state.user);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Advanced Filters
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [selectedSystem, setSelectedSystem] = useState('All');
+  const [showCompanyFilter, setShowCompanyFilter] = useState(false);
+  const [selectedCompany, setSelectedCompany] = useState('All');
 
-  const categories = ['All', ...new Set(productsList.map(p => p.category))];
+  const categories = ['All', ...new Set(productsList.map(p => p.category).filter(Boolean))];
+  const systems = ['All', ...new Set(productsList.map(p => p.body_system).filter(Boolean))];
+  const companies = ['All', ...new Set(productsList.map(p => p.company).filter(Boolean))];
+
   const filteredProducts = productsList.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.company.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
-    return matchesSearch && matchesCategory;
+    const matchesSystem = selectedSystem === 'All' || p.body_system === selectedSystem;
+    const matchesCompany = selectedCompany === 'All' || p.company === selectedCompany;
+    return matchesSearch && matchesCategory && matchesSystem && matchesCompany;
   });
 
   const totalValue = Object.keys(cart).reduce((acc, id) => {
@@ -280,17 +301,24 @@ function CatalogScreen({ setCurrentScreen }) {
         contentContainerStyle={{ padding: 16, paddingBottom: 160 }}
         keyboardShouldPersistTaps="handled"
         ListHeaderComponent={
-          <View style={{ marginBottom: 8 }}>
+          <View style={{ marginBottom: 16 }}>
             <View style={styles.searchContainer}>
               <Text style={{ position: 'absolute', left: 16, zIndex: 2, fontSize: 16 }}>🔍</Text>
               <TextInput
                 style={styles.searchInput}
-                placeholder="Search SKUs, Brands..."
+                placeholder="Search SKUs..."
                 placeholderTextColor="#94a3b8"
                 value={searchQuery}
                 onChangeText={setSearchQuery}
               />
+              <TouchableOpacity style={styles.filterIconBtn} onPress={() => setShowCompanyFilter(true)}>
+                <Text style={{ fontSize: 16 }}>🏢</Text>
+                {selectedCompany !== 'All' && <View style={styles.filterBadge} />}
+              </TouchableOpacity>
             </View>
+
+            {/* Medical Category Filter */}
+            <Text style={styles.filterTitle}>Medical Category</Text>
             <FlatList
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -306,6 +334,24 @@ function CatalogScreen({ setCurrentScreen }) {
                 </TouchableOpacity>
               )}
             />
+
+            {/* Body System Filter */}
+            <Text style={styles.filterTitle}>Body System / Target</Text>
+            <FlatList
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              data={systems}
+              keyExtractor={item => item}
+              contentContainerStyle={{ paddingBottom: 8 }}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[styles.systemPill, selectedSystem === item && styles.systemPillActive]}
+                  onPress={() => { Haptics.selectionAsync(); setSelectedSystem(item); }}
+                >
+                  <Text style={[styles.systemText, selectedSystem === item && styles.systemTextActive]}>{item}</Text>
+                </TouchableOpacity>
+              )}
+            />
           </View>
         }
         data={filteredProducts}
@@ -314,7 +360,7 @@ function CatalogScreen({ setCurrentScreen }) {
           <View style={styles.productCard}>
             <View style={styles.productInfo}>
               <Text style={styles.productName}>{item.name}</Text>
-              <Text style={styles.productDesc}>{item.company} • {item.category}</Text>
+              <Text style={styles.productDesc}>{item.company} • {item.category} • {item.body_system}</Text>
               <View style={styles.priceRow}>
                 <Text style={styles.productPrice}>₹{item.price}</Text>
                 <View style={[styles.stockBadge, item.stock < 10 ? { backgroundColor: '#fee2e2' } : {}]}>
@@ -348,7 +394,42 @@ function CatalogScreen({ setCurrentScreen }) {
             </View>
           </View>
         )}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={{ fontSize: 32, marginBottom: 8 }}>📦</Text>
+            <Text style={styles.emptyText}>No products found.</Text>
+          </View>
+        }
       />
+
+      {/* Company Filter Modal */}
+      <Modal visible={showCompanyFilter} transparent animationType="slide">
+        <View style={styles.modalOverlayBottom}>
+          <View style={styles.bottomSheet}>
+            <View style={styles.dragHandle} />
+            <Text style={styles.modalTitle}>Filter by Manufacturer</Text>
+            <ScrollView contentContainerStyle={{ paddingVertical: 16 }}>
+              {companies.map(c => (
+                <TouchableOpacity 
+                  key={c} 
+                  style={[styles.companyRow, selectedCompany === c && styles.companyRowActive]}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    setSelectedCompany(c);
+                    setShowCompanyFilter(false);
+                  }}
+                >
+                  <Text style={[styles.companyRowText, selectedCompany === c && styles.companyRowTextActive]}>{c}</Text>
+                  {selectedCompany === c && <Text style={{ fontSize: 16 }}>✓</Text>}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <AnimatedPressable style={[styles.buttonPrimary, { marginTop: 16 }]} onPress={() => setShowCompanyFilter(false)}>
+              <Text style={styles.buttonPrimaryText}>Close</Text>
+            </AnimatedPressable>
+          </View>
+        </View>
+      </Modal>
 
       {Object.keys(cart).length > 0 && (
         <AnimatedPressable 
@@ -403,7 +484,7 @@ function CartScreen({ setCurrentScreen }) {
     setIsPlacing(true);
     const newOrder = {
       id: 'UPK' + Math.floor(Math.random() * 1000000),
-      date: new Date().toLocaleDateString(),
+      date: new Date().toLocaleDateString('en-GB'), // DD/MM/YYYY
       store: user.store_name,
       phone: user.phone,
       items: cartItems,
@@ -501,9 +582,23 @@ function CartScreen({ setCurrentScreen }) {
 }
 
 // --- Profile Screen ---
-function ProfileScreen() {
+function ProfileScreen({ setCurrentScreen }) {
   const user = useStore((state) => state.user);
   const orders = useStore((state) => state.orders);
+  const setUser = useStore((state) => state.setUser);
+  const clearCart = useStore((state) => state.clearCart);
+
+  const handleLogout = () => {
+    Haptics.selectionAsync();
+    Alert.alert("Confirm Logout", "Are you sure you want to sign out?", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Logout", style: "destructive", onPress: () => {
+        setUser(null);
+        clearCart();
+        setCurrentScreen('Login');
+      }}
+    ]);
+  };
 
   const generateInvoice = async (order) => {
     const html = `
@@ -533,7 +628,7 @@ function ProfileScreen() {
           </div>
           <table>
             <tr><th>Description</th><th>Qty</th><th>Unit Price</th><th>Amount</th></tr>
-            ${order.items.map(i => `<tr><td><strong style="color: #0f172a;">${i.name}</strong></td><td>${i.quantity}</td><td>₹${i.price}</td><td><strong style="color: #0f172a;">₹${i.price * i.quantity}</strong></td></tr>`).join('')}
+            ${order.items.map(i => `<tr><td><strong style="color: #0f172a;">${i.name}</strong><br/><span style="font-size: 12px; color: #64748b;">${i.company} | ${i.category}</span></td><td>${i.quantity}</td><td>₹${i.price}</td><td><strong style="color: #0f172a;">₹${i.price * i.quantity}</strong></td></tr>`).join('')}
           </table>
           <div class="total">Net Payable: ₹${order.total.toLocaleString('en-IN')}</div>
           <p style="margin-top: 60px; font-size: 12px; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 16px;">
@@ -554,7 +649,13 @@ function ProfileScreen() {
 
   return (
     <View style={styles.screen}>
-      <Text style={styles.pageTitle}>Business Profile</Text>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingRight: 16 }}>
+        <Text style={styles.pageTitle}>Business Profile</Text>
+        <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
+          <Text style={styles.logoutBtnText}>Logout</Text>
+        </TouchableOpacity>
+      </View>
+
       <FlatList
         contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
         ListHeaderComponent={
@@ -580,7 +681,7 @@ function ProfileScreen() {
                 </View>
               </View>
               <View style={styles.progressBar}>
-                <View style={[styles.progressFill, { width: `${Math.min(utilization, 100)}%` }]} />
+                <View style={[styles.progressFill, { width: `${Math.min(utilization, 100)}%`, backgroundColor: utilization > 90 ? '#ef4444' : '#4f46e5' }]} />
               </View>
               <Text style={{color: '#94a3b8', fontSize: 13, marginTop: 16, textAlign: 'right', fontWeight: '600'}}>
                 {(user.credit_limit - user.credit_balance).toLocaleString('en-IN')} Available
@@ -651,19 +752,19 @@ export default function App() {
 
   useEffect(() => {
     fetchAPI();
-    const interval = setInterval(fetchAPI, 3000);
+    const interval = setInterval(fetchAPI, 5000); // Poll every 5s
     return () => clearInterval(interval);
   }, []);
 
   const renderScreen = () => {
     if (currentScreen === 'Login') return <LoginScreen setCurrentScreen={setCurrentScreen} />;
-    if (currentScreen === 'PendingApproval') return <PendingApprovalScreen />;
+    if (currentScreen === 'PendingApproval') return <PendingApprovalScreen setCurrentScreen={setCurrentScreen} />;
     return (
       <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
         <View style={{ flex: 1, paddingTop: Constants.statusBarHeight || 48 }}>
           {currentScreen === 'Catalog' && <CatalogScreen setCurrentScreen={setCurrentScreen} />}
           {currentScreen === 'Cart' && <CartScreen setCurrentScreen={setCurrentScreen} />}
-          {currentScreen === 'Profile' && <ProfileScreen />}
+          {currentScreen === 'Profile' && <ProfileScreen setCurrentScreen={setCurrentScreen} />}
         </View>
         <View style={[styles.tabBar, SHADOWS.lg]}>
           <TouchableOpacity style={styles.tabItem} onPress={() => { Haptics.selectionAsync(); setCurrentScreen('Catalog'); }}>
@@ -696,6 +797,8 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#f8fafc' },
   centeredContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f8fafc', padding: 24 },
   pageTitle: { fontSize: 32, fontWeight: '900', color: '#0f172a', paddingHorizontal: 16, paddingBottom: 16, paddingTop: 8, letterSpacing: -1 },
+  emptyContainer: { alignItems: 'center', marginTop: 40 },
+  emptyText: { color: '#64748b', fontSize: 16, fontWeight: '500' },
   
   // Login
   loginContainer: { flex: 1, backgroundColor: '#020617' }, // Very deep background
@@ -716,13 +819,19 @@ const styles = StyleSheet.create({
   buttonPrimaryText: { color: '#ffffff', fontSize: 18, fontWeight: '800', letterSpacing: 0.5 },
   configText: { color: '#64748b', textAlign: 'center', fontWeight: '700', fontSize: 13, letterSpacing: 1 },
 
-  // Modals
+  // Modals & Bottom Sheets
   modalOverlay: { flex: 1, backgroundColor: 'rgba(2, 6, 23, 0.7)', justifyContent: 'center', padding: 24 },
+  modalOverlayBottom: { flex: 1, backgroundColor: 'rgba(2, 6, 23, 0.7)', justifyContent: 'flex-end' },
   modalContent: { backgroundColor: '#ffffff', borderRadius: 32, padding: 32, ...SHADOWS.lg },
+  bottomSheet: { backgroundColor: '#ffffff', borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, paddingBottom: 40, maxHeight: '80%', ...SHADOWS.lg },
   modalTitle: { fontSize: 24, fontWeight: '900', marginBottom: 8, color: '#0f172a', letterSpacing: -0.5 },
   inputFieldConfig: { borderWidth: 1.5, borderColor: '#e2e8f0', padding: 20, borderRadius: 16, fontSize: 16, backgroundColor: '#f8fafc', color: '#0f172a', fontWeight: '600' },
   btnCancel: { padding: 18, borderRadius: 16, backgroundColor: '#f1f5f9', flex: 1, alignItems: 'center' },
   btnSave: { padding: 18, borderRadius: 16, backgroundColor: '#0f172a', flex: 1, alignItems: 'center', ...SHADOWS.md },
+  companyRow: { paddingVertical: 16, paddingHorizontal: 20, borderRadius: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, backgroundColor: '#f8fafc' },
+  companyRowActive: { backgroundColor: '#e0e7ff', borderColor: '#4f46e5', borderWidth: 1 },
+  companyRowText: { fontSize: 16, fontWeight: '600', color: '#475569' },
+  companyRowTextActive: { color: '#4f46e5', fontWeight: '800' },
 
   // Pending
   iconCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#f1f5f9', justifyContent: 'center', alignItems: 'center', marginBottom: 24 },
@@ -737,66 +846,78 @@ const styles = StyleSheet.create({
   headerCredit: { fontSize: 14, color: '#059669', fontWeight: '700', marginTop: 4 },
   headerLogo: { width: 48, height: 48, borderRadius: 16, ...SHADOWS.sm },
   
-  // Search & Categories
-  searchContainer: { position: 'relative', justifyContent: 'center' },
-  searchInput: { backgroundColor: '#ffffff', padding: 18, paddingLeft: 48, borderRadius: 20, fontSize: 16, borderWidth: 1, borderColor: '#f1f5f9', color: '#0f172a', fontWeight: '600', ...SHADOWS.sm },
+  // Search & Categories (MedPlus Style)
+  searchContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  searchInput: { flex: 1, backgroundColor: '#ffffff', padding: 18, paddingLeft: 48, borderRadius: 20, fontSize: 16, borderWidth: 1, borderColor: '#f1f5f9', color: '#0f172a', fontWeight: '600', ...SHADOWS.sm },
+  filterIconBtn: { width: 60, height: 60, backgroundColor: '#ffffff', borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginLeft: 12, borderWidth: 1, borderColor: '#f1f5f9', ...SHADOWS.sm },
+  filterBadge: { position: 'absolute', top: 14, right: 14, width: 10, height: 10, borderRadius: 5, backgroundColor: '#4f46e5', borderWidth: 2, borderColor: '#ffffff' },
+  filterTitle: { fontSize: 12, fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, paddingHorizontal: 4 },
+  
   categoryPill: { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 24, backgroundColor: '#ffffff', marginRight: 12, borderWidth: 1, borderColor: '#f1f5f9', ...SHADOWS.sm },
   categoryPillActive: { backgroundColor: '#0f172a', borderColor: '#0f172a' },
   categoryText: { color: '#64748b', fontWeight: '700', fontSize: 14 },
   categoryTextActive: { color: '#ffffff' },
+
+  systemPill: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12, backgroundColor: '#f1f5f9', marginRight: 8 },
+  systemPillActive: { backgroundColor: '#e0e7ff' },
+  systemText: { color: '#64748b', fontWeight: '600', fontSize: 13 },
+  systemTextActive: { color: '#4f46e5', fontWeight: '700' },
   
   // Products
   productCard: { backgroundColor: '#ffffff', padding: 20, borderRadius: 24, marginBottom: 16, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#f1f5f9', ...SHADOWS.sm },
   productInfo: { flex: 1, paddingRight: 16 },
-  productName: { fontSize: 17, fontWeight: '800', color: '#0f172a', marginBottom: 6, lineHeight: 22, letterSpacing: -0.5 },
+  productName: { fontSize: 18, fontWeight: '800', color: '#0f172a', marginBottom: 6, letterSpacing: -0.3 },
   productDesc: { fontSize: 13, color: '#64748b', marginBottom: 12, fontWeight: '600' },
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  productPrice: { fontSize: 18, fontWeight: '900', color: '#059669' },
+  productPrice: { fontSize: 20, fontWeight: '900', color: '#0f172a' },
   stockBadge: { backgroundColor: '#f1f5f9', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-  stockText: { fontSize: 11, color: '#475569', fontWeight: '700' },
-  cartAction: { width: 110, alignItems: 'flex-end' },
-  addBtn: { backgroundColor: '#f8fafc', borderColor: '#e2e8f0', borderWidth: 1.5, paddingVertical: 12, width: '100%', borderRadius: 16, alignItems: 'center' },
-  addBtnText: { color: '#0f172a', fontWeight: '900', fontSize: 14 },
+  stockText: { fontSize: 11, fontWeight: '800', color: '#475569' },
   
-  // Qty Controls
-  qtyControls: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', borderRadius: 16, borderWidth: 1, borderColor: '#e2e8f0', width: '100%', overflow: 'hidden' },
-  qtyBtn: { paddingVertical: 12, flex: 1, alignItems: 'center', backgroundColor: '#f1f5f9' },
-  qtyBtnText: { color: '#0f172a', fontWeight: '900', fontSize: 18 },
-  qtyInput: { color: '#0f172a', fontWeight: '900', flex: 1.2, textAlign: 'center', fontSize: 16, paddingVertical: 8, backgroundColor: '#ffffff' },
-  cartItemQtyControls: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', borderRadius: 16, borderWidth: 1, borderColor: '#e2e8f0', width: 120, overflow: 'hidden' },
-  
-  // Smart Cart Tracker
-  smartCartTracker: { position: 'absolute', bottom: 100, left: 16, right: 16, backgroundColor: '#0f172a', padding: 20, flexDirection: 'row', alignItems: 'center', borderRadius: 24 },
-  smartCartTitle: { color: '#ffffff', fontWeight: '800', fontSize: 15, marginBottom: 12, letterSpacing: -0.5 },
-  smartCartProgressBg: { height: 8, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 4, overflow: 'hidden', width: '100%' },
-  smartCartProgressFill: { height: '100%', borderRadius: 4 },
-  smartCartBtn: { backgroundColor: '#4f46e5', width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center' },
-  smartCartBtnText: { color: '#ffffff', fontWeight: '900', fontSize: 20 },
+  cartAction: { alignItems: 'center' },
+  addBtn: { backgroundColor: '#f8fafc', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 16, borderWidth: 1, borderColor: '#e2e8f0' },
+  addBtnText: { color: '#4f46e5', fontWeight: '900', fontSize: 14 },
+  qtyControls: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', borderRadius: 16, borderWidth: 1, borderColor: '#e2e8f0' },
+  qtyBtn: { padding: 12, paddingHorizontal: 16 },
+  qtyBtnText: { fontSize: 18, fontWeight: '800', color: '#4f46e5' },
+  qtyInput: { width: 40, textAlign: 'center', fontSize: 16, fontWeight: '800', color: '#0f172a' },
 
-  // Cart
-  cartItemCard: { backgroundColor: '#ffffff', padding: 20, borderRadius: 24, marginBottom: 16, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#f1f5f9', ...SHADOWS.sm },
-  checkoutFooter: { position: 'absolute', bottom: 85, left: 0, right: 0, backgroundColor: '#ffffff', padding: 24, paddingBottom: 32, borderTopWidth: 1, borderTopColor: '#f1f5f9', ...SHADOWS.lg },
-  billRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20, alignItems: 'center' },
-  billLabel: { fontSize: 16, color: '#64748b', fontWeight: '700' },
-  billTotal: { fontSize: 32, fontWeight: '900', color: '#0f172a', letterSpacing: -1 },
-  minOrderAlert: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fef2f2', padding: 12, borderRadius: 12, marginBottom: 16 },
-  minOrderAlertText: { color: '#ef4444', fontSize: 14, fontWeight: '800' },
-  checkoutBtn: { backgroundColor: '#4f46e5', padding: 20, borderRadius: 20, alignItems: 'center' },
-  checkoutBtnDisabled: { backgroundColor: '#e2e8f0' },
-  checkoutBtnText: { color: '#ffffff', fontSize: 18, fontWeight: '900', letterSpacing: 0.5 },
+  // Smart Cart Tracker
+  smartCartTracker: { position: 'absolute', bottom: 100, left: 16, right: 16, backgroundColor: '#0f172a', borderRadius: 24, padding: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  smartCartTitle: { color: '#ffffff', fontSize: 16, fontWeight: '800', marginBottom: 12 },
+  smartCartProgressBg: { height: 6, backgroundColor: '#334155', borderRadius: 3, overflow: 'hidden' },
+  smartCartProgressFill: { height: '100%', borderRadius: 3 },
+  smartCartBtn: { width: 56, height: 56, borderRadius: 20, backgroundColor: '#1e293b', justifyContent: 'center', alignItems: 'center' },
+  smartCartBtnText: { color: '#ffffff', fontSize: 20, fontWeight: '900' },
+
+  // Cart Screen
+  cartItemCard: { backgroundColor: '#ffffff', padding: 20, borderRadius: 24, marginBottom: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: '#f1f5f9', ...SHADOWS.sm },
+  cartItemQtyControls: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', borderRadius: 16, borderWidth: 1, borderColor: '#e2e8f0' },
+  checkoutFooter: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#ffffff', padding: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 24, borderTopLeftRadius: 32, borderTopRightRadius: 32, ...SHADOWS.lg },
+  billRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  billLabel: { fontSize: 16, color: '#64748b', fontWeight: '600' },
+  billTotal: { fontSize: 28, fontWeight: '900', color: '#0f172a', letterSpacing: -1 },
+  minOrderAlert: { backgroundColor: '#fef2f2', padding: 12, borderRadius: 12, marginBottom: 16, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#fee2e2' },
+  minOrderAlertText: { color: '#dc2626', fontSize: 13, fontWeight: '700' },
+  checkoutBtn: { backgroundColor: '#0f172a', paddingVertical: 20, borderRadius: 20, alignItems: 'center' },
+  checkoutBtnDisabled: { backgroundColor: '#cbd5e1', opacity: 0.7 },
+  checkoutBtnText: { color: '#ffffff', fontSize: 18, fontWeight: '800' },
 
   // Profile
   profileHeader: { alignItems: 'center', marginBottom: 32 },
-  avatar: { width: 96, height: 96, borderRadius: 48, backgroundColor: '#4f46e5', justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
-  profileName: { fontSize: 28, fontWeight: '900', color: '#0f172a', letterSpacing: -1 },
-  profilePhone: { fontSize: 16, color: '#64748b', fontWeight: '600', marginTop: 4 },
-  creditCard: { backgroundColor: '#0f172a', padding: 28, borderRadius: 32, marginBottom: 40 },
-  creditTitle: { color: '#94a3b8', fontSize: 12, fontWeight: '800', letterSpacing: 2, marginBottom: 24, textTransform: 'uppercase' },
+  avatar: { width: 90, height: 90, borderRadius: 45, backgroundColor: '#4f46e5', justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
+  profileName: { fontSize: 24, fontWeight: '900', color: '#0f172a', marginBottom: 4, letterSpacing: -0.5 },
+  profilePhone: { fontSize: 16, color: '#64748b', fontWeight: '600' },
+  logoutBtn: { backgroundColor: '#fee2e2', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12 },
+  logoutBtnText: { color: '#dc2626', fontWeight: '800', fontSize: 13 },
+  
+  creditCard: { backgroundColor: '#0f172a', padding: 24, borderRadius: 32, marginBottom: 40 },
+  creditTitle: { color: '#94a3b8', fontSize: 12, fontWeight: '800', letterSpacing: 2, marginBottom: 20 },
   creditStats: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24 },
-  creditLabel: { color: '#64748b', fontSize: 14, marginBottom: 8, fontWeight: '600' },
-  creditValue: { color: '#ffffff', fontSize: 26, fontWeight: '900', letterSpacing: -1 },
-  progressBar: { height: 10, backgroundColor: '#1e293b', borderRadius: 5, overflow: 'hidden' },
-  progressFill: { height: '100%', backgroundColor: '#10b981', borderRadius: 5 },
+  creditLabel: { color: '#94a3b8', fontSize: 14, fontWeight: '500', marginBottom: 4 },
+  creditValue: { color: '#ffffff', fontSize: 24, fontWeight: '900', letterSpacing: -0.5 },
+  progressBar: { height: 8, backgroundColor: '#1e293b', borderRadius: 4, overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: 4 },
+  
   sectionTitle: { fontSize: 22, fontWeight: '900', color: '#0f172a', marginBottom: 20, letterSpacing: -0.5 },
   orderCard: { backgroundColor: '#ffffff', padding: 24, borderRadius: 24, marginBottom: 16, borderWidth: 1, borderColor: '#f1f5f9', ...SHADOWS.sm },
   orderHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16, alignItems: 'center' },

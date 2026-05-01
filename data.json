@@ -11,7 +11,7 @@
       "phone": "8072116397",
       "store_name": "My Pharma Store",
       "is_approved": true,
-      "credit_balance": 0,
+      "credit_balance": 6090,
       "credit_limit": 100000
     },
     {
@@ -206,6 +206,61 @@
     }
   ],
   "orders": [
+    {
+      "id": "UPK173762",
+      "date": "27/04/2026",
+      "store": "My Pharma Store",
+      "phone": "8072116397",
+      "items": [
+        {
+          "id": 3,
+          "name": "Digital BP Monitor",
+          "company": "Omron",
+          "category": "Devices",
+          "price": 1500,
+          "stock": 1,
+          "quantity": 3
+        },
+        {
+          "id": 4,
+          "name": "Ibuprofen 400mg (Box of 50)",
+          "company": "Sun Pharma",
+          "category": "Analgesics",
+          "price": 180,
+          "stock": 78,
+          "quantity": 2
+        },
+        {
+          "id": 5,
+          "name": "Vitamin C 1000mg (Bottle of 60)",
+          "company": "NatureMade",
+          "category": "Vitamins",
+          "price": 320,
+          "stock": 45,
+          "quantity": 2
+        },
+        {
+          "id": 6,
+          "name": "Cough Syrup 100ml",
+          "company": "Pfizer",
+          "category": "Syrups",
+          "price": 95,
+          "stock": 6,
+          "quantity": 2
+        },
+        {
+          "id": 7,
+          "name": "Cetirizine 10mg (Box of 100)",
+          "company": "Dr. Reddy's",
+          "category": "Allergy",
+          "price": 200,
+          "stock": 150,
+          "quantity": 2
+        }
+      ],
+      "total": 6090,
+      "status": "Placed"
+    },
     {
       "id": "ORD180477",
       "date": "20/04/2026",

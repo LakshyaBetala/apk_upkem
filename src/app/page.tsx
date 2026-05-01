@@ -1,21 +1,33 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Bell, Package, Users, Activity, CheckCircle2, AlertCircle, Plus, Search, Layers, RefreshCcw } from "lucide-react"
+import { Bell, Package, Users, Activity, CheckCircle2, AlertCircle, Plus, Search, Layers, RefreshCcw, LogOut, Upload, FileSpreadsheet, Loader2 } from "lucide-react"
 
 export default function Dashboard() {
+  const router = useRouter();
   const [users, setUsers] = useState<any[]>([]);
   const [inventory, setInventory] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [notifications, setNotifications] = useState(0);
+  const [uploadingUsers, setUploadingUsers] = useState(false);
+  const [uploadingProducts, setUploadingProducts] = useState(false);
+  
+  const userFileInput = useRef<HTMLInputElement>(null);
+  const productFileInput = useRef<HTMLInputElement>(null);
+
+  // Filters state
+  const [searchTerm, setSearchTerm] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [bodySystemFilter, setBodySystemFilter] = useState('');
 
   // New Item Form State
-  const [newItem, setNewItem] = useState({ name: '', company: '', category: '', price: '', stock: '' });
+  const [newItem, setNewItem] = useState({ name: '', company: '', category: '', body_system: '', price: '', stock: '' });
 
   const fetchLiveDB = async () => {
     try {
@@ -23,7 +35,6 @@ export default function Dashboard() {
       if (res.ok) {
         const db = await res.json();
         
-        // Check for new orders to trigger bell notification
         setOrders((prevOrders) => {
           if (prevOrders.length > 0 && db.orders.length > prevOrders.length) {
             setNotifications(n => n + (db.orders.length - prevOrders.length));
@@ -41,22 +52,23 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchLiveDB();
-    const interval = setInterval(fetchLiveDB, 2000);
+    const interval = setInterval(fetchLiveDB, 5000); // Polling every 5s instead of 2s to be gentler on SQLite
     return () => clearInterval(interval);
   }, []);
 
-  const syncRawDB = async (newDbState: any) => {
+  const handleLogout = async () => {
+    await fetch('/api/auth', { method: 'DELETE' });
+    router.push('/login');
+  };
+
+  const handleApproveUser = async (phone: string) => {
+    const updatedUsers = users.map(u => u.phone === phone ? { ...u, is_approved: true } : u);
+    setUsers(updatedUsers);
     await fetch('/api/data', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'raw_override', db: newDbState })
+      body: JSON.stringify({ action: 'raw_override', db: { users: updatedUsers } })
     });
-  };
-
-  const handleApproveUser = (phone: string) => {
-    const updatedUsers = users.map(u => u.phone === phone ? { ...u, is_approved: true } : u);
-    setUsers(updatedUsers);
-    syncRawDB({ users: updatedUsers, products: inventory, orders });
   };
 
   const handleUpdateOrderStatus = async (id: string, newStatus: string) => {
@@ -66,12 +78,7 @@ export default function Dashboard() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ collection: 'orders', item: { id, status: newStatus }, action: 'update_status' })
     });
-  };
-
-  const handleDeleteProduct = (id: number) => {
-    const newInventory = inventory.filter(p => p.id !== id);
-    setInventory(newInventory);
-    syncRawDB({ users, products: newInventory, orders });
+    fetchLiveDB(); // Refresh immediately
   };
 
   const handleUpdateStock = async (id: number, change: number) => {
@@ -86,9 +93,10 @@ export default function Dashboard() {
   const handleAddNewProduct = async () => {
     if (!newItem.name || !newItem.price) return;
     const formattedItem = {
-      name: newItem.name,
+      ...newItem,
       company: newItem.company || 'Unknown',
       category: newItem.category || 'General',
+      body_system: newItem.body_system || 'General',
       price: Number(newItem.price),
       stock: Number(newItem.stock) || 0
     };
@@ -97,7 +105,41 @@ export default function Dashboard() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'add_product', item: formattedItem })
     });
-    setNewItem({ name: '', company: '', category: '', price: '', stock: '' });
+    setNewItem({ name: '', company: '', category: '', body_system: '', price: '', stock: '' });
+    fetchLiveDB();
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'users' | 'products') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (type === 'users') setUploadingUsers(true);
+    else setUploadingProducts(true);
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('type', type);
+
+    try {
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      if (res.ok) {
+        const data = await res.json();
+        alert(`Successfully imported ${data.added} ${type}.`);
+        fetchLiveDB();
+      } else {
+        const err = await res.json();
+        alert(`Upload failed: ${err.error}`);
+      }
+    } catch (err) {
+      alert('An error occurred during upload.');
+    } finally {
+      if (type === 'users') setUploadingUsers(false);
+      else setUploadingProducts(false);
+      if (e.target) e.target.value = ''; // Reset input
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -110,13 +152,37 @@ export default function Dashboard() {
     }
   };
 
+  const isNearingCreditDeadline = (dateStr: string) => {
+    // Assuming format DD/MM/YYYY
+    const [day, month, year] = dateStr.split('/');
+    const orderDate = new Date(`${year}-${month}-${day}`);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - orderDate.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays >= 55 && diffDays <= 60;
+  };
+
+  const isPastCreditDeadline = (dateStr: string) => {
+    const [day, month, year] = dateStr.split('/');
+    const orderDate = new Date(`${year}-${month}-${day}`);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - orderDate.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays > 60;
+  };
+
+  const filteredInventory = inventory.filter(p => {
+    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.company.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCat = categoryFilter ? p.category === categoryFilter : true;
+    const matchesSystem = bodySystemFilter ? p.body_system === bodySystemFilter : true;
+    return matchesSearch && matchesCat && matchesSystem;
+  });
+
+  const uniqueCategories = Array.from(new Set(inventory.map(p => p.category))).filter(Boolean);
+  const uniqueSystems = Array.from(new Set(inventory.map(p => p.body_system))).filter(Boolean);
+
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-900 font-sans selection:bg-indigo-100 selection:text-indigo-900">
-      {/* 
-        PREMIUM HEADER
-        Moving away from standard white box headers. Using a deep slate header for the "Command Center" feel,
-        establishing immediate authority and enterprise trust.
-      */}
       <header className="bg-slate-950 text-white border-b border-slate-800 shadow-sm sticky top-0 z-50">
         <div className="max-w-[1400px] mx-auto px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -150,13 +216,16 @@ export default function Dashboard() {
                 </span>
               )}
             </div>
+            <div className="h-8 w-px bg-slate-800 mx-2"></div>
+            <Button variant="ghost" onClick={handleLogout} className="text-slate-300 hover:text-white hover:bg-slate-800 gap-2 h-10 px-3 rounded-lg">
+              <LogOut className="w-4 h-4" />
+              <span className="text-sm font-semibold hidden md:inline">Logout</span>
+            </Button>
           </div>
         </div>
       </header>
 
       <main className="max-w-[1400px] mx-auto px-6 py-10">
-        
-        {/* METRICS ROW */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
           <Card className="bg-white border-0 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] rounded-2xl overflow-hidden group">
             <div className="h-1.5 w-full bg-indigo-600"></div>
@@ -221,10 +290,6 @@ export default function Dashboard() {
                   <h2 className="text-2xl font-bold tracking-tight text-slate-900">Order Management</h2>
                   <p className="text-slate-500 mt-1 font-medium">Review, accept, and process incoming B2B wholesale orders.</p>
                 </div>
-                <div className="relative">
-                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input type="text" placeholder="Search orders..." className="pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none w-64 transition-shadow" />
-                </div>
               </div>
               <div className="overflow-x-auto">
                 <Table>
@@ -249,14 +314,19 @@ export default function Dashboard() {
                          });
                       }
 
+                      const nearingDeadline = isNearingCreditDeadline(o.date) && o.status === 'Shipped';
+                      const pastDeadline = isPastCreditDeadline(o.date) && o.status === 'Shipped';
+
                       return (
-                      <TableRow key={o.id} className={`border-b border-slate-100 hover:bg-slate-50 transition-colors group ${o.status === 'Placed' ? 'bg-amber-50/20' : ''}`}>
+                      <TableRow key={o.id} className={`border-b border-slate-100 hover:bg-slate-50 transition-colors group ${o.status === 'Placed' ? 'bg-amber-50/20' : ''} ${pastDeadline ? 'bg-red-50/30' : ''}`}>
                         <TableCell className="font-bold text-slate-900 py-5 pl-8 font-mono text-sm">
                           {o.id}
                           {isOverStock && <span className="flex items-center gap-1 text-[10px] text-red-600 uppercase tracking-wider font-bold mt-1.5"><AlertCircle className="w-3 h-3"/> Exceeds Stock</span>}
+                          {nearingDeadline && <span className="flex items-center gap-1 text-[10px] text-amber-600 uppercase tracking-wider font-bold mt-1.5"><Bell className="w-3 h-3"/> 55+ Days Due</span>}
+                          {pastDeadline && <span className="flex items-center gap-1 text-[10px] text-red-600 uppercase tracking-wider font-bold mt-1.5"><AlertCircle className="w-3 h-3"/> Past 60 Days</span>}
                         </TableCell>
                         <TableCell className="py-5">
-                          <span className="font-semibold text-slate-800">{o.store}</span>
+                          <span className="font-semibold text-slate-800">{o.store_name}</span>
                         </TableCell>
                         <TableCell className="text-slate-500 text-sm font-medium py-5">{o.date}</TableCell>
                         <TableCell className="py-5">
@@ -305,9 +375,22 @@ export default function Dashboard() {
           {/* USERS TAB */}
           <TabsContent value="users" className="mt-0 outline-none animate-in fade-in slide-in-from-bottom-4 duration-500">
             <Card className="border-0 shadow-xl shadow-slate-200/50 bg-white rounded-3xl overflow-hidden ring-1 ring-slate-100">
-              <div className="p-6 md:p-8 border-b border-slate-100 bg-white">
-                <h2 className="text-2xl font-bold tracking-tight text-slate-900">Partner & Credit Directory</h2>
-                <p className="text-slate-500 mt-1 font-medium">Manage B2B relationships, approve access, and monitor credit lines.</p>
+              <div className="p-6 md:p-8 border-b border-slate-100 bg-white flex justify-between items-center">
+                <div>
+                  <h2 className="text-2xl font-bold tracking-tight text-slate-900">Partner & Credit Directory</h2>
+                  <p className="text-slate-500 mt-1 font-medium">Manage B2B relationships, approve access, and monitor credit lines.</p>
+                </div>
+                <div className="flex gap-3">
+                  <input type="file" accept=".xlsx, .xls" className="hidden" ref={userFileInput} onChange={(e) => handleFileUpload(e, 'users')} />
+                  <Button variant="outline" className="border-indigo-200 text-indigo-700 hover:bg-indigo-50" onClick={() => window.open('/templates/Users_Upload_Template.xlsx', '_blank')}>
+                    <FileSpreadsheet className="w-4 h-4 mr-2" />
+                    Template
+                  </Button>
+                  <Button className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-200" onClick={() => userFileInput.current?.click()} disabled={uploadingUsers}>
+                    {uploadingUsers ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
+                    Bulk Upload Clients
+                  </Button>
+                </div>
               </div>
               <Table>
                 <TableHeader className="bg-slate-50/80">
@@ -322,11 +405,12 @@ export default function Dashboard() {
                 </TableHeader>
                 <TableBody>
                   {users.map((user) => {
+                    if (user.role === 'admin') return null;
                     const shippedDebt = orders
-                      .filter(o => o.store === user.store_name && o.status === 'Shipped')
+                      .filter(o => o.store_name === user.store_name && o.status === 'Shipped')
                       .reduce((acc, order) => acc + order.total, 0);
 
-                    const creditPercentage = (user.credit_balance / user.credit_limit) * 100;
+                    const creditPercentage = user.credit_limit > 0 ? (user.credit_balance / user.credit_limit) * 100 : 0;
 
                     return (
                     <TableRow key={user.phone} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
@@ -351,7 +435,7 @@ export default function Dashboard() {
                             ₹{user.credit_balance.toLocaleString('en-IN')} <span className="text-slate-400 font-medium text-xs">/ {user.credit_limit.toLocaleString('en-IN')}</span>
                           </span>
                           <div className="w-32 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                            <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${Math.min(creditPercentage, 100)}%` }}></div>
+                            <div className={`h-full rounded-full ${creditPercentage > 90 ? 'bg-red-500' : 'bg-indigo-500'}`} style={{ width: `${Math.min(creditPercentage, 100)}%` }}></div>
                           </div>
                         </div>
                       </TableCell>
@@ -388,32 +472,64 @@ export default function Dashboard() {
                   <h2 className="text-2xl font-bold tracking-tight text-slate-900">Master Catalog</h2>
                   <p className="text-slate-500 mt-1 font-medium">Control inventory levels, pricing, and new product listings.</p>
                 </div>
+                <div className="flex gap-3">
+                  <input type="file" accept=".xlsx, .xls" className="hidden" ref={productFileInput} onChange={(e) => handleFileUpload(e, 'products')} />
+                  <Button variant="outline" className="border-indigo-200 text-indigo-700 hover:bg-indigo-50" onClick={() => window.open('/templates/Products_Upload_Template.xlsx', '_blank')}>
+                    <FileSpreadsheet className="w-4 h-4 mr-2" />
+                    Template
+                  </Button>
+                  <Button className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-200" onClick={() => productFileInput.current?.click()} disabled={uploadingProducts}>
+                    {uploadingProducts ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
+                    Bulk Upload Excel
+                  </Button>
+                </div>
               </div>
               
               <div className="p-6 md:p-8 bg-slate-50/50 border-b border-slate-100">
-                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm shadow-slate-100">
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm shadow-slate-100 mb-6">
                   <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
                     <Plus className="w-4 h-4 text-indigo-600"/> Add New SKU
                   </h3>
-                  <div className="flex flex-col md:flex-row gap-4 items-end">
-                    <div className="flex-1 w-full">
+                  <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
+                    <div className="col-span-2">
                       <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Product Name</label>
                       <input type="text" placeholder="e.g. Paracetamol 500mg" value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} className="w-full text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all" />
                     </div>
-                    <div className="flex-1 w-full">
+                    <div>
                       <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Manufacturer</label>
                       <input type="text" placeholder="e.g. GSK" value={newItem.company} onChange={e => setNewItem({...newItem, company: e.target.value})} className="w-full text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all" />
                     </div>
-                    <div className="w-full md:w-32">
-                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Price (₹)</label>
-                      <input type="number" placeholder="100" value={newItem.price} onChange={e => setNewItem({...newItem, price: e.target.value})} className="w-full text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all" />
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Category / Body</label>
+                      <div className="flex gap-2">
+                        <input type="text" placeholder="Category" value={newItem.category} onChange={e => setNewItem({...newItem, category: e.target.value})} className="w-1/2 text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all" />
+                        <input type="text" placeholder="System" value={newItem.body_system} onChange={e => setNewItem({...newItem, body_system: e.target.value})} className="w-1/2 text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all" />
+                      </div>
                     </div>
-                    <div className="w-full md:w-32">
-                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Initial Stock</label>
-                      <input type="number" placeholder="50" value={newItem.stock} onChange={e => setNewItem({...newItem, stock: e.target.value})} className="w-full text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all" />
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Price / Stock</label>
+                      <div className="flex gap-2">
+                        <input type="number" placeholder="₹" value={newItem.price} onChange={e => setNewItem({...newItem, price: e.target.value})} className="w-1/2 text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all" />
+                        <input type="number" placeholder="Qty" value={newItem.stock} onChange={e => setNewItem({...newItem, stock: e.target.value})} className="w-1/2 text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all" />
+                      </div>
                     </div>
-                    <Button onClick={handleAddNewProduct} className="bg-slate-900 hover:bg-indigo-600 text-white font-bold h-[46px] px-6 rounded-xl shadow-md transition-all w-full md:w-auto">Create SKU</Button>
+                    <Button onClick={handleAddNewProduct} className="bg-slate-900 hover:bg-indigo-600 text-white font-bold h-[46px] rounded-xl shadow-md transition-all w-full">Create</Button>
                   </div>
+                </div>
+
+                <div className="flex flex-col md:flex-row gap-4 mb-2">
+                  <div className="relative flex-1">
+                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input type="text" placeholder="Search by name or company..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-shadow shadow-sm" />
+                  </div>
+                  <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="py-2.5 px-4 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none shadow-sm md:w-48">
+                    <option value="">All Categories</option>
+                    {uniqueCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  <select value={bodySystemFilter} onChange={e => setBodySystemFilter(e.target.value)} className="py-2.5 px-4 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none shadow-sm md:w-48">
+                    <option value="">All Body Systems</option>
+                    {uniqueSystems.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
                 </div>
               </div>
 
@@ -427,12 +543,12 @@ export default function Dashboard() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {inventory.map((product) => (
+                  {filteredInventory.map((product) => (
                     <TableRow key={product.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
                       <TableCell className="py-4 pl-8">
                         <div className="flex flex-col">
                           <span className="font-bold text-slate-900 text-base tracking-tight">{product.name}</span>
-                          <span className="text-xs font-semibold text-indigo-600">{product.company} &bull; <span className="text-slate-400">{product.category}</span></span>
+                          <span className="text-xs font-semibold text-indigo-600">{product.company} &bull; <span className="text-slate-400">{product.category} {product.body_system !== 'General' && `(${product.body_system})`}</span></span>
                         </div>
                       </TableCell>
                       <TableCell className="text-right py-4 font-black text-slate-900 tabular-nums">
@@ -449,7 +565,7 @@ export default function Dashboard() {
                         </div>
                       </TableCell>
                       <TableCell className="text-right py-4 pr-8">
-                         <Button size="icon" variant="ghost" onClick={() => handleDeleteProduct(product.id)} className="h-8 w-8 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors">
+                         <Button size="icon" variant="ghost" className="h-8 w-8 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors">
                            <AlertCircle className="w-4 h-4" />
                          </Button>
                       </TableCell>
