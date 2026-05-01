@@ -23,6 +23,7 @@ export function initDB() {
       password_hash TEXT,
       credit_balance REAL DEFAULT 0,
       credit_limit REAL DEFAULT 0,
+      expo_push_token TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -44,6 +45,8 @@ export function initDB() {
       status TEXT DEFAULT 'Placed',
       total REAL NOT NULL,
       date TEXT NOT NULL,
+      courier_name TEXT,
+      tracking_id TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY(user_phone) REFERENCES users(phone)
     );

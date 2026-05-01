@@ -13,7 +13,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing credentials' }, { status: 400 });
     }
 
-    const user = db.prepare('SELECT * FROM users WHERE phone = ?').get(phone);
+    const user = db.prepare('SELECT * FROM users WHERE phone = ?').get(phone) as any;
 
     if (!user) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });

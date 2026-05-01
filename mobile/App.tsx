@@ -12,6 +12,18 @@ import Constants from 'expo-constants';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as Haptics from 'expo-haptics';
+import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// Notification Handler
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -99,6 +111,7 @@ const useStore = create((set, get) => ({
   orders: [],
   setOrders: (orders) => set({ orders }),
   getApiUrl: () => `http://${get().serverIp}:3000/api/data`,
+  getTokenUrl: () => `http://${get().serverIp}:3000/api/user/token`,
   placeOrder: async (order) => {
     try {
       await fetch(get().getApiUrl(), {
@@ -120,6 +133,36 @@ const useStore = create((set, get) => ({
   },
 }));
 
+// Notifications helper
+async function registerForPushNotificationsAsync() {
+  let token;
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('default', {
+      name: 'default',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#4f46e5',
+    });
+  }
+
+  if (Device.isDevice) {
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+    if (finalStatus !== 'granted') {
+      console.log('Failed to get push token for push notification!');
+      return;
+    }
+    token = (await Notifications.getExpoPushTokenAsync({ projectId: Constants.expoConfig.extra.eas.projectId || undefined })).data;
+  } else {
+    console.log('Must use physical device for Push Notifications');
+  }
+  return token;
+}
+
 // --- Login Screen ---
 function LoginScreen({ setCurrentScreen }) {
   const [phone, setPhone] = useState('');
@@ -130,10 +173,11 @@ function LoginScreen({ setCurrentScreen }) {
   const usersList = useStore((state) => state.usersList);
   const serverIp = useStore((state) => state.serverIp);
   const setServerIp = useStore((state) => state.setServerIp);
+  const getTokenUrl = useStore((state) => state.getTokenUrl);
 
   useEffect(() => { setTempIp(serverIp); }, [serverIp]);
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     Haptics.selectionAsync();
     if (usersList.length === 0) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -146,6 +190,21 @@ function LoginScreen({ setCurrentScreen }) {
       Alert.alert('Access Denied', 'Unregistered or invalid mobile number.');
       return;
     }
+
+    // Try to get Expo Push Token and send to server
+    try {
+      const pushToken = await registerForPushNotificationsAsync();
+      if (pushToken) {
+        fetch(getTokenUrl(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: foundUser.phone, token: pushToken })
+        }).catch(e => console.log('Silent token update fail', e));
+      }
+    } catch(err) {
+      console.log('Push notification registration failed', err);
+    }
+
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setUser(foundUser);
@@ -705,6 +764,13 @@ function ProfileScreen({ setCurrentScreen }) {
               <Text style={styles.orderDate}>{item.date}</Text>
               <Text style={styles.orderTotal}>₹{item.total.toLocaleString('en-IN')}</Text>
             </View>
+            {item.status === 'Shipped' && item.courier_name && (
+              <View style={{ backgroundColor: '#f8fafc', padding: 12, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#64748b', textTransform: 'uppercase', marginBottom: 4 }}>Delivery Info</Text>
+                <Text style={{ fontSize: 14, fontWeight: '800', color: '#0f172a' }}>{item.courier_name}</Text>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: '#4f46e5', marginTop: 2 }}>{item.tracking_id}</Text>
+              </View>
+            )}
             {item.status !== 'Rejected' && (
               <AnimatedPressable style={styles.invoiceBtn} onPress={() => generateInvoice(item)}>
                 <Text style={styles.invoiceBtnText}>📄 Download Tax Invoice</Text>
@@ -726,15 +792,21 @@ function ProfileScreen({ setCurrentScreen }) {
 // --- App Root ---
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState('Login');
+  const [isOfflineMode, setIsOfflineMode] = useState(false);
   
   const fetchAPI = async () => {
     try {
       const url = useStore.getState().getApiUrl();
       const res = await fetch(url);
-      if (!res.ok) return;
+      if (!res.ok) throw new Error('API Not OK');
       const db = await res.json();
+      
+      // Cache success to AsyncStorage
+      await AsyncStorage.setItem('@upkem_cached_db', JSON.stringify(db));
+      
       useStore.getState().setProducts(db.products || []);
       useStore.getState().setUsersList(db.users || []);
+      setIsOfflineMode(false);
       
       const currUser = useStore.getState().user;
       if (currUser) {
@@ -746,7 +818,18 @@ export default function App() {
         }
       }
     } catch (e) {
-      // Quiet fail for polling
+      // Offline fallback
+      try {
+        const cachedData = await AsyncStorage.getItem('@upkem_cached_db');
+        if (cachedData) {
+          const db = JSON.parse(cachedData);
+          useStore.getState().setProducts(db.products || []);
+          useStore.getState().setUsersList(db.users || []);
+          setIsOfflineMode(true);
+        }
+      } catch (err) {
+        console.error("Cache read error", err);
+      }
     }
   };
 
@@ -762,6 +845,11 @@ export default function App() {
     return (
       <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
         <View style={{ flex: 1, paddingTop: Constants.statusBarHeight || 48 }}>
+          {isOfflineMode && (
+            <View style={{ backgroundColor: '#fef3c7', padding: 8, alignItems: 'center' }}>
+              <Text style={{ color: '#d97706', fontSize: 12, fontWeight: '800' }}>⚠️ OFFLINE MODE - Showing Cached Catalog</Text>
+            </View>
+          )}
           {currentScreen === 'Catalog' && <CatalogScreen setCurrentScreen={setCurrentScreen} />}
           {currentScreen === 'Cart' && <CartScreen setCurrentScreen={setCurrentScreen} />}
           {currentScreen === 'Profile' && <ProfileScreen setCurrentScreen={setCurrentScreen} />}

@@ -1,14 +1,39 @@
 import { NextResponse } from 'next/server';
 import db from '@/lib/db';
 
+async function sendPushNotification(expoPushToken: string, title: string, body: string) {
+  if (!expoPushToken) return;
+  const message = {
+    to: expoPushToken,
+    sound: 'default',
+    title: title,
+    body: body,
+    data: { someData: 'goes here' },
+  };
+
+  try {
+    await fetch('https://exp.host/--/api/v2/push/send', {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Accept-encoding': 'gzip, deflate',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(message),
+    });
+  } catch (err) {
+    console.error('Push Notification Error:', err);
+  }
+}
+
 export async function GET() {
   try {
-    const users = db.prepare('SELECT id, phone, store_name, is_approved, role, credit_balance, credit_limit, created_at FROM users').all();
-    const products = db.prepare('SELECT * FROM products').all();
-    const orders = db.prepare('SELECT * FROM orders ORDER BY created_at DESC').all();
+    const users = db.prepare('SELECT id, phone, store_name, is_approved, role, credit_balance, credit_limit, created_at FROM users').all() as any[];
+    const products = db.prepare('SELECT * FROM products').all() as any[];
+    const orders = db.prepare('SELECT * FROM orders ORDER BY created_at DESC').all() as any[];
     
     // Join order items
-    const populatedOrders = orders.map(order => {
+    const populatedOrders = orders.map((order: any) => {
       const items = db.prepare(`
         SELECT oi.*, p.name, p.company, p.category 
         FROM order_items oi 
@@ -17,7 +42,7 @@ export async function GET() {
       `).all(order.id);
       
       // format items to match frontend expectations
-      const formattedItems = items.map(item => ({
+      const formattedItems = items.map((item: any) => ({
         id: item.product_id,
         name: item.name,
         company: item.company,
@@ -89,14 +114,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true });
     } 
     else if (collection === 'orders' && action === 'update_status') {
-      const getOrder = db.prepare('SELECT * FROM orders WHERE id = ?').get(item.id);
+      const getOrder = db.prepare('SELECT * FROM orders WHERE id = ?').get(item.id) as any;
       if (!getOrder) return NextResponse.json({ error: 'Order not found' }, { status: 404 });
 
-      const updateOrder = db.prepare('UPDATE orders SET status = ? WHERE id = ?');
+      // Get user's push token
+      const user = db.prepare('SELECT expo_push_token FROM users WHERE phone = ?').get(getOrder.user_phone) as any;
+
+      const updateOrder = db.prepare('UPDATE orders SET status = ?, courier_name = ?, tracking_id = ? WHERE id = ?');
       const refundCredit = db.prepare('UPDATE users SET credit_balance = MAX(0, credit_balance - ?) WHERE phone = ? OR store_name = ?');
       const deductStock = db.prepare('UPDATE products SET stock = stock - ? WHERE id = ?');
       
-      const getItems = db.prepare('SELECT product_id, quantity FROM order_items WHERE order_id = ?').all(item.id);
+      const getItems = db.prepare('SELECT product_id, quantity FROM order_items WHERE order_id = ?').all(item.id) as any[];
 
       const updateStatusTransaction = db.transaction(() => {
         // Stock reduction when accepted
@@ -111,10 +139,30 @@ export async function POST(request: Request) {
           refundCredit.run(getOrder.total, getOrder.user_phone, getOrder.store_name);
         }
 
-        updateOrder.run(item.status, item.id);
+        updateOrder.run(item.status, item.courier_name || null, item.tracking_id || null, item.id);
       });
 
       updateStatusTransaction();
+
+      // Send Push Notification
+      if (user && user.expo_push_token) {
+        let title = 'Order Update';
+        let body = `Your order ${item.id} status is now: ${item.status}`;
+        
+        if (item.status === 'Shipped') {
+          title = 'Order Dispatched 🚚';
+          body = `Your order ${item.id} has been shipped via ${item.courier_name || 'Courier'}.`;
+        } else if (item.status === 'Accepted') {
+          title = 'Order Accepted ✅';
+          body = `Your order ${item.id} has been accepted and is being processed.`;
+        } else if (item.status === 'Rejected') {
+          title = 'Order Rejected ❌';
+          body = `Unfortunately, your order ${item.id} was rejected. Your credit has been refunded.`;
+        }
+
+        await sendPushNotification(user.expo_push_token, title, body);
+      }
+
       return NextResponse.json({ success: true });
     }
     else if (action === 'raw_override') {

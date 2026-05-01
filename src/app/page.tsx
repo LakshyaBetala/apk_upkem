@@ -7,7 +7,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Bell, Package, Users, Activity, CheckCircle2, AlertCircle, Plus, Search, Layers, RefreshCcw, LogOut, Upload, FileSpreadsheet, Loader2 } from "lucide-react"
+import { Bell, Package, Users, Activity, CheckCircle2, AlertCircle, Plus, Search, Layers, RefreshCcw, LogOut, Upload, FileSpreadsheet, Loader2, BarChart } from "lucide-react"
+
+// Recharts for Analytics
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart as RechartsBarChart, Bar, Legend } from 'recharts';
 
 export default function Dashboard() {
   const router = useRouter();
@@ -72,11 +75,27 @@ export default function Dashboard() {
   };
 
   const handleUpdateOrderStatus = async (id: string, newStatus: string) => {
-    setOrders(orders.map(o => o.id === id ? { ...o, status: newStatus } : o));
+    let logistics = { courier_name: '', tracking_id: '' };
+    
+    if (newStatus === 'Shipped') {
+      const courier = window.prompt("Enter Courier Name (e.g. BlueDart):");
+      if (courier === null) return; // User cancelled
+      const tracking = window.prompt("Enter Tracking ID:");
+      if (tracking === null) return; // User cancelled
+      logistics.courier_name = courier;
+      logistics.tracking_id = tracking;
+    }
+
+    setOrders(orders.map(o => o.id === id ? { ...o, status: newStatus, ...logistics } : o));
+    
     await fetch('/api/data', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ collection: 'orders', item: { id, status: newStatus }, action: 'update_status' })
+      body: JSON.stringify({ 
+        collection: 'orders', 
+        item: { id, status: newStatus, ...logistics }, 
+        action: 'update_status' 
+      })
     });
     fetchLiveDB(); // Refresh immediately
   };
@@ -181,6 +200,34 @@ export default function Dashboard() {
   const uniqueCategories = Array.from(new Set(inventory.map(p => p.category))).filter(Boolean);
   const uniqueSystems = Array.from(new Set(inventory.map(p => p.body_system))).filter(Boolean);
 
+  // Analytics Processing
+  const revenueByDate = orders.filter(o => o.status !== 'Rejected').reduce((acc: any, order: any) => {
+    const date = order.date; // assuming string
+    if (!acc[date]) acc[date] = 0;
+    acc[date] += order.total;
+    return acc;
+  }, {} as any);
+  
+  const revenueData = Object.keys(revenueByDate).slice(-7).map(date => ({
+    date,
+    revenue: revenueByDate[date]
+  }));
+
+  const skuVolume = orders.filter(o => o.status !== 'Rejected').reduce((acc: any, order: any) => {
+    if(order.items && Array.isArray(order.items)) {
+      order.items.forEach((item: any) => {
+        if (!acc[item.name]) acc[item.name] = 0;
+        acc[item.name] += item.quantity;
+      });
+    }
+    return acc;
+  }, {} as any);
+
+  const topSKUs = Object.keys(skuVolume)
+    .map(name => ({ name: name.substring(0, 15) + '...', volume: skuVolume[name] }))
+    .sort((a, b) => b.volume - a.volume)
+    .slice(0, 5);
+
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-900 font-sans selection:bg-indigo-100 selection:text-indigo-900">
       <header className="bg-slate-950 text-white border-b border-slate-800 shadow-sm sticky top-0 z-50">
@@ -275,10 +322,11 @@ export default function Dashboard() {
 
         <Tabs defaultValue="orders" className="w-full">
           <div className="flex justify-between items-end mb-8">
-            <TabsList className="h-14 bg-white border border-slate-200/60 p-1.5 rounded-2xl shadow-sm inline-flex">
+            <TabsList className="h-14 bg-white border border-slate-200/60 p-1.5 rounded-2xl shadow-sm inline-flex overflow-x-auto max-w-full">
               <TabsTrigger value="orders" className="data-[state=active]:bg-slate-900 data-[state=active]:text-white rounded-xl px-6 font-semibold text-sm transition-all">Live Orders</TabsTrigger>
               <TabsTrigger value="users" className="data-[state=active]:bg-slate-900 data-[state=active]:text-white rounded-xl px-6 font-semibold text-sm transition-all">Credit & Partners</TabsTrigger>
               <TabsTrigger value="inventory" className="data-[state=active]:bg-slate-900 data-[state=active]:text-white rounded-xl px-6 font-semibold text-sm transition-all">Inventory Control</TabsTrigger>
+              <TabsTrigger value="analytics" className="data-[state=active]:bg-slate-900 data-[state=active]:text-white rounded-xl px-6 font-semibold text-sm transition-all flex items-center gap-2"><BarChart className="w-4 h-4" /> Analytics</TabsTrigger>
             </TabsList>
           </div>
           
@@ -300,7 +348,7 @@ export default function Dashboard() {
                       <TableHead className="text-slate-500 font-bold uppercase tracking-wider text-xs py-5">Date</TableHead>
                       <TableHead className="text-slate-500 font-bold uppercase tracking-wider text-xs py-5 w-[300px]">Items</TableHead>
                       <TableHead className="text-slate-500 font-bold uppercase tracking-wider text-xs py-5 text-right">Total (₹)</TableHead>
-                      <TableHead className="text-slate-500 font-bold uppercase tracking-wider text-xs py-5 text-center">Status</TableHead>
+                      <TableHead className="text-slate-500 font-bold uppercase tracking-wider text-xs py-5 text-center">Status / Logistics</TableHead>
                       <TableHead className="text-slate-500 font-bold uppercase tracking-wider text-xs py-5 pr-8 text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -343,6 +391,11 @@ export default function Dashboard() {
                         </TableCell>
                         <TableCell className="text-center py-5">
                           {getStatusBadge(o.status)}
+                          {o.status === 'Shipped' && o.courier_name && (
+                            <div className="mt-2 text-[10px] font-bold text-slate-500 bg-slate-100 rounded px-2 py-1">
+                              {o.courier_name}: {o.tracking_id}
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell className="text-right py-5 pr-8">
                           <div className="flex justify-end gap-2 opacity-100 transition-opacity">
@@ -573,6 +626,48 @@ export default function Dashboard() {
                   ))}
                 </TableBody>
               </Table>
+            </Card>
+          </TabsContent>
+
+          {/* ANALYTICS TAB */}
+          <TabsContent value="analytics" className="mt-0 outline-none animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <Card className="border-0 shadow-xl shadow-slate-200/50 bg-white rounded-3xl overflow-hidden ring-1 ring-slate-100 p-8">
+              <div className="mb-8">
+                <h2 className="text-2xl font-bold tracking-tight text-slate-900">Platform Analytics</h2>
+                <p className="text-slate-500 mt-1 font-medium">Business intelligence and performance metrics.</p>
+              </div>
+              
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100">
+                  <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2"><Activity className="w-5 h-5 text-indigo-500"/> Revenue Trend (Last 7 Active Days)</h3>
+                  <div className="h-64 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={revenueData}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                        <XAxis dataKey="date" tick={{fontSize: 12, fill: '#64748b'}} axisLine={false} tickLine={false} />
+                        <YAxis tickFormatter={(val) => `₹${val/1000}k`} tick={{fontSize: 12, fill: '#64748b'}} axisLine={false} tickLine={false} width={60} />
+                        <RechartsTooltip formatter={(value) => [`₹${value}`, 'Revenue']} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}/>
+                        <Line type="monotone" dataKey="revenue" stroke="#4f46e5" strokeWidth={4} dot={{r: 4, fill: '#4f46e5', strokeWidth: 2, stroke: '#fff'}} activeDot={{r: 6}} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100">
+                  <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2"><Package className="w-5 h-5 text-emerald-500"/> Top 5 SKUs (By Volume)</h3>
+                  <div className="h-64 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RechartsBarChart data={topSKUs} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
+                        <XAxis type="number" tick={{fontSize: 12, fill: '#64748b'}} axisLine={false} tickLine={false} />
+                        <YAxis dataKey="name" type="category" tick={{fontSize: 11, fill: '#475569'}} axisLine={false} tickLine={false} width={100} />
+                        <RechartsTooltip formatter={(value) => [value, 'Units Sold']} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}/>
+                        <Bar dataKey="volume" fill="#10b981" radius={[0, 4, 4, 0]} barSize={24} />
+                      </RechartsBarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
             </Card>
           </TabsContent>
         </Tabs>
