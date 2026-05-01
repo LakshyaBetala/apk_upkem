@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Layers, Loader2 } from 'lucide-react';
+import { Loader2, Shield } from 'lucide-react';
 
 export default function LoginPage() {
   const [phone, setPhone] = useState('');
@@ -42,56 +42,78 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center p-4">
-      <div className="max-w-md w-full">
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shadow-xl shadow-indigo-500/20 border border-indigo-400/30 mb-6">
-            <Layers className="text-white w-8 h-8" />
+    <div className="min-h-screen bg-[#F0F5F3] flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Background Pattern */}
+      <div className="absolute inset-0 opacity-[0.03]" style={{
+        backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%231B4332' fill-opacity='1'%3E%3Ccircle cx='7' cy='7' r='1.5'/%3E%3Ccircle cx='37' cy='37' r='1.5'/%3E%3C/g%3E%3C/svg%3E")`,
+      }} />
+
+      {/* Top Brand Bar */}
+      <div className="absolute top-0 left-0 right-0 h-2 upkem-header-gradient" />
+      
+      <div className="max-w-md w-full relative z-10">
+        {/* Logo & Branding */}
+        <div className="text-center mb-10">
+          <div className="w-24 h-24 mx-auto mb-6 relative">
+            <div className="absolute inset-0 bg-brand-800/10 rounded-3xl rotate-6" />
+            <div className="relative bg-white rounded-2xl p-3 shadow-lg shadow-brand-800/10 border border-brand-200/50">
+              <img 
+                src="/pharma_logo.jpeg" 
+                alt="Upkem Labs" 
+                className="w-full h-full object-contain rounded-lg"
+              />
+            </div>
           </div>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900">UPKEM LABS</h1>
-          <p className="text-slate-500 font-medium mt-2">Admin Command Center</p>
+          <h1 className="text-3xl font-black tracking-tight text-brand-900">UPKEM LABS</h1>
+          <p className="text-brand-600 font-semibold mt-1.5 text-sm tracking-wide uppercase">We Build Trust Not Medicine</p>
         </div>
 
-        <Card className="border-0 shadow-xl shadow-slate-200/50 rounded-2xl overflow-hidden">
-          <div className="h-1.5 w-full bg-gradient-to-r from-indigo-500 to-indigo-600"></div>
+        <Card className="border-0 shadow-xl shadow-brand-800/8 rounded-2xl overflow-hidden ring-1 ring-brand-200/30 bg-white">
+          <div className="h-1.5 w-full upkem-header-gradient" />
           <CardHeader className="px-8 pt-8 pb-4">
-            <CardTitle className="text-2xl font-bold">Secure Login</CardTitle>
-            <CardDescription className="text-slate-500 text-base">
-              Enter your credentials to access the dashboard.
+            <div className="flex items-center gap-2 mb-1">
+              <div className="p-1.5 bg-brand-50 rounded-lg">
+                <Shield className="w-4 h-4 text-brand-700" />
+              </div>
+              <CardTitle className="text-xl font-bold text-brand-900">Admin Access</CardTitle>
+            </div>
+            <CardDescription className="text-brand-600/70 text-base">
+              Enter your credentials to access the command center.
             </CardDescription>
           </CardHeader>
           <CardContent className="px-8 pb-8">
             <form onSubmit={handleLogin} className="space-y-5">
               {error && (
-                <div className="p-3 rounded-lg bg-red-50 border border-red-100 text-red-600 text-sm font-medium">
+                <div className="p-3 rounded-xl bg-red-50 border border-red-100 text-red-600 text-sm font-semibold flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" />
                   {error}
                 </div>
               )}
               <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700">Phone Number</label>
+                <label className="text-sm font-bold text-brand-800">Phone Number</label>
                 <Input 
                   type="tel"
                   placeholder="e.g. 6383945610" 
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  className="h-12 border-slate-200 bg-slate-50/50 text-base font-medium rounded-xl focus-visible:ring-indigo-500"
+                  className="h-12 border-brand-200 bg-brand-50/30 text-base font-medium rounded-xl focus-visible:ring-brand-500 focus-visible:border-brand-400 placeholder:text-brand-300"
                   required
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700">Password</label>
+                <label className="text-sm font-bold text-brand-800">Password</label>
                 <Input 
                   type="password"
                   placeholder="••••••••" 
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="h-12 border-slate-200 bg-slate-50/50 text-base font-medium rounded-xl focus-visible:ring-indigo-500"
+                  className="h-12 border-brand-200 bg-brand-50/30 text-base font-medium rounded-xl focus-visible:ring-brand-500 focus-visible:border-brand-400 placeholder:text-brand-300"
                   required
                 />
               </div>
               <Button 
                 type="submit" 
-                className="w-full h-12 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-base shadow-lg shadow-indigo-600/20 transition-all mt-4"
+                className="w-full h-12 bg-brand-800 hover:bg-brand-700 text-white rounded-xl font-bold text-base shadow-lg shadow-brand-800/20 transition-all mt-4 cursor-pointer"
                 disabled={loading}
               >
                 {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Access Dashboard"}
@@ -99,6 +121,10 @@ export default function LoginPage() {
             </form>
           </CardContent>
         </Card>
+
+        <p className="text-center text-brand-400 text-xs font-medium mt-8 tracking-wide">
+          UPKEM LABS © {new Date().getFullYear()} — B2B Wholesale Platform
+        </p>
       </div>
     </div>
   );

@@ -35,6 +35,7 @@ export function initDB() {
       body_system TEXT,
       price REAL NOT NULL,
       stock INTEGER DEFAULT 0,
+      image_url TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -61,6 +62,13 @@ export function initDB() {
       FOREIGN KEY(product_id) REFERENCES products(id)
     );
   `);
+
+  // Migration: Add image_url column if it doesn't exist (for existing databases)
+  try {
+    db.prepare("SELECT image_url FROM products LIMIT 1").get();
+  } catch {
+    db.exec("ALTER TABLE products ADD COLUMN image_url TEXT");
+  }
 }
 
 export default db;

@@ -28,8 +28,8 @@ export async function POST(request: Request) {
 
     if (type === 'products') {
       const insertProduct = db.prepare(`
-        INSERT INTO products (name, company, category, body_system, price, stock)
-        VALUES (@name, @company, @category, @body_system, @price, @stock)
+        INSERT INTO products (name, company, category, body_system, price, stock, image_url)
+        VALUES (@name, @company, @category, @body_system, @price, @stock, @image_url)
       `);
       
       const bulkInsert = db.transaction((items) => {
@@ -40,7 +40,8 @@ export async function POST(request: Request) {
             category: item.category || 'General',
             body_system: item.body_system || 'General',
             price: Number(item.price) || 0,
-            stock: Number(item.stock) || 0
+            stock: Number(item.stock) || 0,
+            image_url: item.image_url || null
           });
           added++;
         }

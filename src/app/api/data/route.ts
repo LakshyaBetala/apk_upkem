@@ -181,8 +181,8 @@ export async function POST(request: Request) {
     }
     else if (action === 'add_product') {
       const insertProduct = db.prepare(`
-        INSERT INTO products (name, company, category, body_system, price, stock)
-        VALUES (@name, @company, @category, @body_system, @price, @stock)
+        INSERT INTO products (name, company, category, body_system, price, stock, image_url)
+        VALUES (@name, @company, @category, @body_system, @price, @stock, @image_url)
       `);
       insertProduct.run({
         name: item.name,
@@ -190,7 +190,8 @@ export async function POST(request: Request) {
         category: item.category,
         body_system: item.body_system || 'General',
         price: item.price,
-        stock: item.stock
+        stock: item.stock,
+        image_url: item.image_url || null
       });
       return NextResponse.json({ success: true });
     }
