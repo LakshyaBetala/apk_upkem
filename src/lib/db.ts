@@ -24,6 +24,12 @@ export function initDB() {
       credit_balance REAL DEFAULT 0,
       credit_limit REAL DEFAULT 0,
       expo_push_token TEXT,
+      drug_license TEXT,
+      gst_number TEXT,
+      registration_number TEXT,
+      address TEXT,
+      email TEXT,
+      user_type TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -34,9 +40,34 @@ export function initDB() {
       category TEXT NOT NULL,
       body_system TEXT,
       price REAL NOT NULL,
+      price_ptr REAL,
+      mrp REAL,
+      packing TEXT,
+      description TEXT,
+      composition TEXT,
       stock INTEGER DEFAULT 0,
       image_url TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS sessions (
+      id TEXT PRIMARY KEY,
+      user_phone TEXT NOT NULL,
+      device_info TEXT,
+      last_active DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(user_phone) REFERENCES users(phone)
+    );
+
+    CREATE TABLE IF NOT EXISTS invoices (
+      id TEXT PRIMARY KEY,
+      order_id TEXT NOT NULL,
+      user_phone TEXT NOT NULL,
+      amount REAL NOT NULL,
+      status TEXT DEFAULT 'Unpaid',
+      due_date DATETIME NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(order_id) REFERENCES orders(id),
+      FOREIGN KEY(user_phone) REFERENCES users(phone)
     );
 
     CREATE TABLE IF NOT EXISTS orders (
