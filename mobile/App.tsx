@@ -393,7 +393,7 @@ function CatalogScreen({ setCurrentScreen }) {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedSystem, setSelectedSystem] = useState('All');
   const [showCompanyFilter, setShowCompanyFilter] = useState(false);
-  const [selectedCompanies, setSelectedCompanies] = useState([]);
+  const [selectedCompany, setSelectedCompany] = useState('All');
   const [sortOption, setSortOption] = useState('name_asc');
   const [selectedProduct, setSelectedProduct] = useState(null);
 
@@ -405,7 +405,7 @@ function CatalogScreen({ setCurrentScreen }) {
     const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
     const matchesSystem = selectedSystem === 'All' || p.body_system === selectedSystem;
-    const matchesCompany = selectedCompanies.length === 0 || selectedCompanies.includes(p.company);
+    const matchesCompany = selectedCompany === 'All' || p.company === selectedCompany;
     return matchesSearch && matchesCategory && matchesSystem && matchesCompany;
   });
   
