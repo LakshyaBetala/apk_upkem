@@ -69,6 +69,24 @@ const AnimatedPressable = ({ onPress, style, children, disabled }) => {
   );
 };
 
+// Product image mapping by category
+const CATEGORY_IMAGES: Record<string, string> = {
+  'Analgesics':       'https://images.unsplash.com/photo-1550572017-edd951b55104?w=300&h=300&fit=crop',
+  'Antibiotics':      'https://images.unsplash.com/photo-1631549916768-4119b2e5f926?w=300&h=300&fit=crop',
+  'Devices':          'https://images.unsplash.com/photo-1584467735815-f778f274e296?w=300&h=300&fit=crop',
+  'Diabetic Care':    'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=300&h=300&fit=crop',
+  'Allergy':          'https://images.unsplash.com/photo-1471864190281-a93a3070b6de?w=300&h=300&fit=crop',
+  'Gastrointestinal': 'https://images.unsplash.com/photo-1587854692152-cbe660dbde88?w=300&h=300&fit=crop',
+  'Vitamins':         'https://images.unsplash.com/photo-1559059699-085698eba48c?w=300&h=300&fit=crop',
+  'First Aid':        'https://images.unsplash.com/photo-1583912267550-d6c2ac3196c0?w=300&h=300&fit=crop',
+  'Ointments':        'https://images.unsplash.com/photo-1576602975754-7423a4f3e7e0?w=300&h=300&fit=crop',
+  'Syrups':           'https://images.unsplash.com/photo-1631549919535-0b2b75c63a90?w=300&h=300&fit=crop',
+  'General':          'https://images.unsplash.com/photo-1576602975754-7423a4f3e7e0?w=300&h=300&fit=crop',
+};
+const DEFAULT_PRODUCT_IMAGE = 'https://images.unsplash.com/photo-1587854692152-cbe660dbde88?w=300&h=300&fit=crop';
+const getProductImage = (product: any) => CATEGORY_IMAGES[product.category] || DEFAULT_PRODUCT_IMAGE;
+const getTimeOfDay = () => { const h = new Date().getHours(); return h < 12 ? 'Morning' : h < 17 ? 'Afternoon' : 'Evening'; };
+
 const useStore = create((set, get) => ({
   serverIp: DEFAULT_IP,
   setServerIp: (ip) => set({ serverIp: ip }),
@@ -277,7 +295,7 @@ function LoginScreen({ setCurrentScreen }) {
       const data = await res.json();
       if(data.success) {
         setUser(data.user);
-        setCurrentScreen('Catalog');
+        setCurrentScreen('Home');
       } else if (data.pending) {
         setUser(data.user);
         setCurrentScreen('PendingApproval');
@@ -379,8 +397,106 @@ function PendingApprovalScreen({ setCurrentScreen }) {
   );
 }
 
+// --- Home Screen (MedPlus-style) ---
+const HOME_CATEGORIES = [
+  { name: 'Analgesics',       icon: '💊', bg: '#fef3c7' },
+  { name: 'Antibiotics',      icon: '🧬', bg: '#ede9fe' },
+  { name: 'Diabetic Care',    icon: '🩺', bg: '#dcfce7' },
+  { name: 'Allergy',          icon: '🤧', bg: '#e0f2fe' },
+  { name: 'Gastrointestinal', icon: '🫁', bg: '#fce7f3' },
+  { name: 'Vitamins',         icon: '⚡', bg: '#fef9c3' },
+  { name: 'Devices',          icon: '🔬', bg: '#f0fdf4' },
+  { name: 'Syrups',           icon: '🧪', bg: '#fff7ed' },
+  { name: 'First Aid',        icon: '🩹', bg: '#fef2f2' },
+  { name: 'Ointments',        icon: '🧴', bg: '#f8f0ff' },
+];
+
+function HomeScreen({ setCurrentScreen, onCategorySelect }) {
+  const products = useStore((s) => s.products);
+  const user = useStore((s) => s.user);
+  const featured = products.slice(0, 8);
+
+  return (
+    <View style={styles.screen}>
+      <StatusBar barStyle="dark-content" />
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+        {/* Header */}
+        <View style={styles.homeHeader}>
+          <View>
+            <Text style={styles.homeGreeting}>Good {getTimeOfDay()},</Text>
+            <Text style={styles.homeStoreName}>{user?.store_name}</Text>
+          </View>
+          <Image source={require('./assets/pharma_logo.jpeg')} style={styles.headerLogo} />
+        </View>
+
+        {/* Search shortcut */}
+        <TouchableOpacity style={styles.homeSearchBar} onPress={() => setCurrentScreen('Catalog')} activeOpacity={0.85}>
+          <Text style={{ fontSize: 16, marginRight: 10 }}>🔍</Text>
+          <Text style={styles.homeSearchPlaceholder}>Search medicines, devices…</Text>
+        </TouchableOpacity>
+
+        {/* Promo banner */}
+        <View style={styles.promoBanner}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.promoBannerTitle}>60-Day Credit Line</Text>
+            <Text style={styles.promoBannerSub}>Place orders above ₹{MIN_ORDER_VALUE.toLocaleString('en-IN')} and enjoy B2B credit terms.</Text>
+            <TouchableOpacity style={styles.promoBannerBtn} onPress={() => setCurrentScreen('Catalog')}>
+              <Text style={styles.promoBannerBtnText}>Shop Now →</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={{ fontSize: 48, marginLeft: 12 }}>💳</Text>
+        </View>
+
+        {/* Shop by Category */}
+        <View style={styles.homeSectionRow}>
+          <Text style={styles.homeSectionTitle}>Shop by Category</Text>
+          <TouchableOpacity onPress={() => { onCategorySelect('All'); setCurrentScreen('Catalog'); }}>
+            <Text style={styles.seeAllText}>See All</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.homeCategoryGrid}>
+          {HOME_CATEGORIES.map((cat) => (
+            <TouchableOpacity
+              key={cat.name}
+              style={[styles.homeCategoryItem, { backgroundColor: cat.bg }]}
+              onPress={() => { Haptics.selectionAsync(); onCategorySelect(cat.name); setCurrentScreen('Catalog'); }}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.homeCategoryIcon}>{cat.icon}</Text>
+              <Text style={styles.homeCategoryText} numberOfLines={2}>{cat.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Featured Products */}
+        <View style={styles.homeSectionRow}>
+          <Text style={styles.homeSectionTitle}>Featured Products</Text>
+          <TouchableOpacity onPress={() => { onCategorySelect('All'); setCurrentScreen('Catalog'); }}>
+            <Text style={styles.seeAllText}>View All</Text>
+          </TouchableOpacity>
+        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 8 }}>
+          {featured.map((p) => (
+            <TouchableOpacity
+              key={p.id}
+              style={styles.featuredCard}
+              onPress={() => { onCategorySelect('All'); setCurrentScreen('Catalog'); }}
+              activeOpacity={0.8}
+            >
+              <Image source={{ uri: getProductImage(p) }} style={styles.featuredCardImage} />
+              <Text style={styles.featuredCardName} numberOfLines={2}>{p.name}</Text>
+              <Text style={styles.featuredCardCompany} numberOfLines={1}>{p.company}</Text>
+              <Text style={styles.featuredCardPrice}>₹{p.price_ptr || p.price}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </ScrollView>
+    </View>
+  );
+}
+
 // --- Catalog Screen ---
-function CatalogScreen({ setCurrentScreen }) {
+function CatalogScreen({ setCurrentScreen, initialCategory }) {
   const addToCart = useStore((state) => state.addToCart);
   const removeFromCart = useStore((state) => state.removeFromCart);
   const setCartQuantity = useStore((state) => state.setCartQuantity);
@@ -388,27 +504,43 @@ function CatalogScreen({ setCurrentScreen }) {
   const productsList = useStore((state) => state.products);
   const user = useStore((state) => state.user);
   const [searchQuery, setSearchQuery] = useState('');
-  
-  // Advanced Filters
-  const [selectedCategory, setSelectedCategory] = useState('All');
-  const [selectedSystem, setSelectedSystem] = useState('All');
-  const [showCompanyFilter, setShowCompanyFilter] = useState(false);
+
+  // Flipkart-style multi-select filters
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(
+    initialCategory && initialCategory !== 'All' ? [initialCategory] : []
+  );
+  const [selectedSystems, setSelectedSystems] = useState<string[]>([]);
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState('All');
   const [sortOption, setSortOption] = useState('name_asc');
   const [selectedProduct, setSelectedProduct] = useState(null);
 
-  const categories = ['All', ...new Set(productsList.map(p => p.category).filter(Boolean))];
-  const systems = ['All', ...new Set(productsList.map(p => p.body_system).filter(Boolean))];
+  const categories = [...new Set(productsList.map(p => p.category).filter(Boolean))].sort() as string[];
+  const systems = [...new Set(productsList.map(p => p.body_system).filter(Boolean))].sort() as string[];
   const companies = ['All', ...new Set(productsList.map(p => p.company).filter(Boolean))];
 
+  const toggleCategory = (cat: string) => {
+    Haptics.selectionAsync();
+    setSelectedCategories(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]);
+  };
+  const toggleSystem = (sys: string) => {
+    Haptics.selectionAsync();
+    setSelectedSystems(prev => prev.includes(sys) ? prev.filter(s => s !== sys) : [...prev, sys]);
+  };
+  const clearAllFilters = () => { setSelectedCategories([]); setSelectedSystems([]); setSelectedCompany('All'); setSortOption('name_asc'); };
+  const activeFilterCount = selectedCategories.length + selectedSystems.length + (selectedCompany !== 'All' ? 1 : 0);
+
   let filteredProducts = productsList.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
-    const matchesSystem = selectedSystem === 'All' || p.body_system === selectedSystem;
+    const q = searchQuery.toLowerCase();
+    const matchesSearch = !q || p.name.toLowerCase().includes(q) ||
+      (p.company || '').toLowerCase().includes(q) ||
+      (p.composition || '').toLowerCase().includes(q);
+    const matchesCategory = selectedCategories.length === 0 || selectedCategories.includes(p.category);
+    const matchesSystem = selectedSystems.length === 0 || selectedSystems.includes(p.body_system);
     const matchesCompany = selectedCompany === 'All' || p.company === selectedCompany;
     return matchesSearch && matchesCategory && matchesSystem && matchesCompany;
   });
-  
+
   if (sortOption === 'price_asc') filteredProducts.sort((a,b) => (a.price_ptr || a.price) - (b.price_ptr || b.price));
   if (sortOption === 'price_desc') filteredProducts.sort((a,b) => (b.price_ptr || b.price) - (a.price_ptr || a.price));
   if (sortOption === 'name_asc') filteredProducts.sort((a,b) => a.name.localeCompare(b.name));
@@ -436,68 +568,68 @@ function CatalogScreen({ setCurrentScreen }) {
         contentContainerStyle={{ padding: 16, paddingBottom: 160 }}
         keyboardShouldPersistTaps="handled"
         ListHeaderComponent={
-          <View style={{ marginBottom: 16 }}>
-            <View style={styles.searchContainer}>
-              <Text style={{ position: 'absolute', left: 16, zIndex: 2, fontSize: 16 }}>🔍</Text>
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search SKUs..."
-                placeholderTextColor="#94a3b8"
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-              />
-              <TouchableOpacity style={styles.filterIconBtn} onPress={() => setShowCompanyFilter(true)}>
-                <Text style={{ fontSize: 16 }}>🏢</Text>
-                {selectedCompany !== 'All' && <View style={styles.filterBadge} />}
+          <View style={{ marginBottom: 8 }}>
+            {/* Search + Filter button row */}
+            <View style={styles.searchRow}>
+              <View style={[styles.searchContainer, { flex: 1 }]}>
+                <Text style={{ position: 'absolute', left: 16, zIndex: 2, fontSize: 16 }}>🔍</Text>
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search SKUs, brands, composition..."
+                  placeholderTextColor="#94a3b8"
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                />
+              </View>
+              <TouchableOpacity
+                style={[styles.filterBtn, activeFilterCount > 0 && styles.filterBtnActive]}
+                onPress={() => setShowFilterPanel(true)}
+              >
+                <Text style={{ fontSize: 14 }}>⚡</Text>
+                <Text style={[styles.filterBtnText, activeFilterCount > 0 && { color: '#fff' }]}>Filter</Text>
+                {activeFilterCount > 0 && (
+                  <View style={styles.filterCountBadge}>
+                    <Text style={styles.filterCountText}>{activeFilterCount}</Text>
+                  </View>
+                )}
               </TouchableOpacity>
             </View>
 
-            {/* Medical Category Filter */}
-            <Text style={styles.filterTitle}>Medical Category</Text>
-            <FlatList
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              data={categories}
-              keyExtractor={item => item}
-              contentContainerStyle={{ paddingBottom: 16 }}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[styles.categoryPill, selectedCategory === item && styles.categoryPillActive]}
-                  onPress={() => { Haptics.selectionAsync(); setSelectedCategory(item); }}
-                >
-                  <Text style={[styles.categoryText, selectedCategory === item && styles.categoryTextActive]}>{item}</Text>
+            {/* Active filter chips */}
+            {activeFilterCount > 0 && (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10, marginBottom: 4 }}>
+                {selectedCategories.map(cat => (
+                  <TouchableOpacity key={cat} style={styles.activeChip} onPress={() => toggleCategory(cat)}>
+                    <Text style={styles.activeChipText}>{cat} ✕</Text>
+                  </TouchableOpacity>
+                ))}
+                {selectedSystems.map(sys => (
+                  <TouchableOpacity key={sys} style={styles.activeChip} onPress={() => toggleSystem(sys)}>
+                    <Text style={styles.activeChipText}>{sys} ✕</Text>
+                  </TouchableOpacity>
+                ))}
+                {selectedCompany !== 'All' && (
+                  <TouchableOpacity style={styles.activeChip} onPress={() => setSelectedCompany('All')}>
+                    <Text style={styles.activeChipText}>{selectedCompany} ✕</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity style={styles.clearChip} onPress={clearAllFilters}>
+                  <Text style={styles.clearChipText}>Clear All</Text>
                 </TouchableOpacity>
-              )}
-            />
-
-            {/* Body System Filter */}
-            <Text style={styles.filterTitle}>Body System / Target</Text>
-            <FlatList
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              data={systems}
-              keyExtractor={item => item}
-              contentContainerStyle={{ paddingBottom: 8 }}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[styles.systemPill, selectedSystem === item && styles.systemPillActive]}
-                  onPress={() => { Haptics.selectionAsync(); setSelectedSystem(item); }}
-                >
-                  <Text style={[styles.systemText, selectedSystem === item && styles.systemTextActive]}>{item}</Text>
-                </TouchableOpacity>
-              )}
-            />
+              </ScrollView>
+            )}
           </View>
         }
         data={filteredProducts}
         keyExtractor={item => item.id.toString()}
         renderItem={({ item }) => (
           <TouchableOpacity style={styles.productCard} onPress={() => setSelectedProduct(item)} activeOpacity={0.8}>
+            <Image source={{ uri: getProductImage(item) }} style={styles.productThumb} />
             <View style={styles.productInfo}>
-              <Text style={styles.productName}>{item.name}</Text>
-              <Text style={styles.productDesc}>{item.company} • {item.category} • {item.body_system}</Text>
+              <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
+              <Text style={styles.productDesc}>{item.company} • {item.category}</Text>
               <View style={styles.priceRow}>
-                <Text style={styles.productPrice}>₹{item.price}</Text>
+                <Text style={styles.productPrice}>₹{item.price_ptr || item.price}</Text>
                 <View style={[styles.stockBadge, item.stock < 10 ? { backgroundColor: '#fee2e2' } : {}]}>
                   <Text style={[styles.stockText, item.stock < 10 ? { color: '#dc2626' } : {}]}>
                     {item.stock > 0 ? `${item.stock} in stock` : 'Out of Stock'}
@@ -540,71 +672,127 @@ function CatalogScreen({ setCurrentScreen }) {
       {/* Product Details Modal */}
       <Modal visible={!!selectedProduct} transparent animationType="slide">
         <View style={styles.modalOverlayBottom}>
-          <View style={styles.bottomSheet}>
+          <View style={[styles.bottomSheet, { maxHeight: '88%' }]}>
             <View style={styles.dragHandle} />
             {selectedProduct && (
-              <ScrollView>
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <Image source={{ uri: getProductImage(selectedProduct) }} style={styles.detailImage} />
                 <Text style={styles.modalTitle}>{selectedProduct.name}</Text>
-                <Text style={{color: '#64748b', fontSize: 16, marginBottom: 12}}>{selectedProduct.company}</Text>
-                <View style={{flexDirection: 'row', gap: 8, marginBottom: 16}}>
+                <Text style={{ color: '#64748b', fontSize: 16, marginBottom: 12 }}>{selectedProduct.company}</Text>
+                <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
                   <View style={styles.systemPillActive}><Text style={styles.systemTextActive}>{selectedProduct.category}</Text></View>
-                  <View style={styles.systemPill}><Text style={styles.systemText}>{selectedProduct.body_system}</Text></View>
+                  {selectedProduct.body_system ? <View style={styles.systemPill}><Text style={styles.systemText}>{selectedProduct.body_system}</Text></View> : null}
                 </View>
-                <View style={{backgroundColor: '#f8fafc', padding: 16, borderRadius: 16, marginBottom: 16}}>
-                  <Text style={{fontSize: 12, fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase'}}>Composition</Text>
-                  <Text style={{fontSize: 16, color: '#0f172a', marginTop: 4}}>{selectedProduct.composition || 'Standard Formulation'}</Text>
+                <View style={styles.detailInfoBox}>
+                  <Text style={styles.detailInfoLabel}>Composition</Text>
+                  <Text style={styles.detailInfoValue}>{selectedProduct.composition || 'Standard Formulation'}</Text>
                 </View>
-                <View style={{backgroundColor: '#f8fafc', padding: 16, borderRadius: 16, marginBottom: 16}}>
-                  <Text style={{fontSize: 12, fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase'}}>Description</Text>
-                  <Text style={{fontSize: 15, color: '#475569', marginTop: 4, lineHeight: 22}}>{selectedProduct.description || 'No description available for this SKU.'}</Text>
+                <View style={styles.detailInfoBox}>
+                  <Text style={styles.detailInfoLabel}>Description & Usage</Text>
+                  <Text style={[styles.detailInfoValue, { color: '#475569', lineHeight: 22 }]}>
+                    {selectedProduct.description || 'No description available for this SKU.'}
+                  </Text>
                 </View>
-                <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8}}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 8, backgroundColor: '#f8fafc', padding: 16, borderRadius: 16 }}>
                   <View>
-                    <Text style={{fontSize: 12, fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase'}}>PTR Price</Text>
-                    <Text style={{fontSize: 24, fontWeight: '900', color: '#0f172a'}}>₹{selectedProduct.price_ptr || selectedProduct.price}</Text>
+                    <Text style={styles.detailInfoLabel}>PTR Price</Text>
+                    <Text style={{ fontSize: 26, fontWeight: '900', color: '#0f172a' }}>₹{selectedProduct.price_ptr || selectedProduct.price}</Text>
                   </View>
-                  <View>
-                    <Text style={{fontSize: 12, fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase'}}>MRP</Text>
-                    <Text style={{fontSize: 18, fontWeight: '700', color: '#64748b', textDecorationLine: 'line-through'}}>₹{selectedProduct.mrp || (selectedProduct.price * 1.2).toFixed(2)}</Text>
+                  <View style={{ alignItems: 'center' }}>
+                    <Text style={styles.detailInfoLabel}>MRP</Text>
+                    <Text style={{ fontSize: 18, fontWeight: '700', color: '#94a3b8', textDecorationLine: 'line-through' }}>
+                      ₹{selectedProduct.mrp || Math.round((selectedProduct.price_ptr || selectedProduct.price) * 1.2)}
+                    </Text>
                   </View>
-                  <View>
-                    <Text style={{fontSize: 12, fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase'}}>Packing</Text>
-                    <Text style={{fontSize: 16, fontWeight: '700', color: '#0f172a'}}>{selectedProduct.packing || '1x10'}</Text>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={styles.detailInfoLabel}>Packing</Text>
+                    <Text style={{ fontSize: 16, fontWeight: '700', color: '#0f172a' }}>{selectedProduct.packing || '1×10'}</Text>
                   </View>
                 </View>
               </ScrollView>
             )}
-            <AnimatedPressable style={[styles.buttonPrimary, { marginTop: 24 }]} onPress={() => setSelectedProduct(null)}>
+            <AnimatedPressable style={[styles.buttonPrimary, { marginTop: 20 }]} onPress={() => setSelectedProduct(null)}>
               <Text style={styles.buttonPrimaryText}>Close</Text>
             </AnimatedPressable>
           </View>
         </View>
       </Modal>
 
-      {/* Company Filter Modal */}
-      <Modal visible={showCompanyFilter} transparent animationType="slide">
+      {/* Flipkart-style Filter Panel */}
+      <Modal visible={showFilterPanel} transparent animationType="slide">
         <View style={styles.modalOverlayBottom}>
-          <View style={styles.bottomSheet}>
+          <View style={[styles.bottomSheet, { maxHeight: '88%' }]}>
             <View style={styles.dragHandle} />
-            <Text style={styles.modalTitle}>Filter by Manufacturer</Text>
-            <ScrollView contentContainerStyle={{ paddingVertical: 16 }}>
-              {companies.map(c => (
-                <TouchableOpacity 
-                  key={c} 
-                  style={[styles.companyRow, selectedCompany === c && styles.companyRowActive]}
-                  onPress={() => {
-                    Haptics.selectionAsync();
-                    setSelectedCompany(c);
-                    setShowCompanyFilter(false);
-                  }}
-                >
-                  <Text style={[styles.companyRowText, selectedCompany === c && styles.companyRowTextActive]}>{c}</Text>
-                  {selectedCompany === c && <Text style={{ fontSize: 16 }}>✓</Text>}
+            <View style={styles.filterPanelHeader}>
+              <Text style={styles.modalTitle}>Filters</Text>
+              <TouchableOpacity onPress={clearAllFilters}><Text style={styles.clearAllText}>Clear All</Text></TouchableOpacity>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* Sort */}
+              <Text style={styles.filterSectionTitle}>Sort By</Text>
+              {([
+                { key: 'name_asc',   label: 'Name (A → Z)' },
+                { key: 'price_asc',  label: 'Price: Low to High' },
+                { key: 'price_desc', label: 'Price: High to Low' },
+              ] as const).map(opt => (
+                <TouchableOpacity key={opt.key} style={styles.filterRadioRow} onPress={() => { Haptics.selectionAsync(); setSortOption(opt.key); }}>
+                  <View style={[styles.radioOuter, sortOption === opt.key && styles.radioOuterActive]}>
+                    {sortOption === opt.key && <View style={styles.radioInner} />}
+                  </View>
+                  <Text style={[styles.filterOptionText, sortOption === opt.key && styles.filterOptionTextActive]}>{opt.label}</Text>
                 </TouchableOpacity>
               ))}
+
+              {/* Category */}
+              <Text style={styles.filterSectionTitle}>Medical Category</Text>
+              <View style={styles.filterChipsWrap}>
+                {categories.map(cat => (
+                  <TouchableOpacity
+                    key={cat}
+                    style={[styles.filterChip, selectedCategories.includes(cat) && styles.filterChipActive]}
+                    onPress={() => toggleCategory(cat)}
+                  >
+                    <Text style={[styles.filterChipText, selectedCategories.includes(cat) && styles.filterChipTextActive]}>{cat}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Body System */}
+              {systems.length > 0 && (
+                <>
+                  <Text style={styles.filterSectionTitle}>Body System / Target</Text>
+                  <View style={styles.filterChipsWrap}>
+                    {systems.map(sys => (
+                      <TouchableOpacity
+                        key={sys}
+                        style={[styles.filterChip, selectedSystems.includes(sys) && styles.filterChipActive]}
+                        onPress={() => toggleSystem(sys)}
+                      >
+                        <Text style={[styles.filterChipText, selectedSystems.includes(sys) && styles.filterChipTextActive]}>{sys}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </>
+              )}
+
+              {/* Manufacturer */}
+              <Text style={styles.filterSectionTitle}>Manufacturer</Text>
+              <View style={styles.filterChipsWrap}>
+                {companies.map(c => (
+                  <TouchableOpacity
+                    key={c}
+                    style={[styles.filterChip, selectedCompany === c && styles.filterChipActive]}
+                    onPress={() => { Haptics.selectionAsync(); setSelectedCompany(c); }}
+                  >
+                    <Text style={[styles.filterChipText, selectedCompany === c && styles.filterChipTextActive]}>{c}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </ScrollView>
-            <AnimatedPressable style={[styles.buttonPrimary, { marginTop: 16 }]} onPress={() => setShowCompanyFilter(false)}>
-              <Text style={styles.buttonPrimaryText}>Close</Text>
+            <AnimatedPressable style={[styles.buttonPrimary, { marginTop: 16 }]} onPress={() => setShowFilterPanel(false)}>
+              <Text style={styles.buttonPrimaryText}>
+                {activeFilterCount > 0 ? `Apply Filters (${activeFilterCount} active)` : 'Apply'}
+              </Text>
             </AnimatedPressable>
           </View>
         </View>
@@ -913,6 +1101,7 @@ function ProfileScreen({ setCurrentScreen }) {
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState('Login');
   const [isOfflineMode, setIsOfflineMode] = useState(false);
+  const [catalogInitialCategory, setCatalogInitialCategory] = useState('All');
   
   const fetchAPI = async () => {
     try {
@@ -971,26 +1160,39 @@ export default function App() {
               <Text style={{ color: '#d97706', fontSize: 12, fontWeight: '800' }}>⚠️ OFFLINE MODE - Showing Cached Catalog</Text>
             </View>
           )}
-          {currentScreen === 'Catalog' && <CatalogScreen setCurrentScreen={setCurrentScreen} />}
+          {currentScreen === 'Home' && (
+            <HomeScreen
+              setCurrentScreen={setCurrentScreen}
+              onCategorySelect={setCatalogInitialCategory}
+            />
+          )}
+          {currentScreen === 'Catalog' && (
+            <CatalogScreen
+              setCurrentScreen={setCurrentScreen}
+              initialCategory={catalogInitialCategory}
+            />
+          )}
           {currentScreen === 'Cart' && <CartScreen setCurrentScreen={setCurrentScreen} />}
           {currentScreen === 'Profile' && <ProfileScreen setCurrentScreen={setCurrentScreen} />}
         </View>
         <View style={[styles.tabBar, SHADOWS.lg]}>
-          <TouchableOpacity style={styles.tabItem} onPress={() => { Haptics.selectionAsync(); setCurrentScreen('Catalog'); }}>
-            <Text style={{fontSize: 22, marginBottom: 4, opacity: currentScreen === 'Catalog' ? 1 : 0.5}}>📦</Text>
+          <TouchableOpacity style={styles.tabItem} onPress={() => { Haptics.selectionAsync(); setCurrentScreen('Home'); }}>
+            <Text style={{ fontSize: 22, marginBottom: 4, opacity: currentScreen === 'Home' ? 1 : 0.5 }}>🏠</Text>
+            <Text style={[styles.tabText, currentScreen === 'Home' && styles.tabTextActive]}>Home</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.tabItem} onPress={() => { Haptics.selectionAsync(); setCatalogInitialCategory('All'); setCurrentScreen('Catalog'); }}>
+            <Text style={{ fontSize: 22, marginBottom: 4, opacity: currentScreen === 'Catalog' ? 1 : 0.5 }}>📦</Text>
             <Text style={[styles.tabText, currentScreen === 'Catalog' && styles.tabTextActive]}>Catalog</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.tabItem} onPress={() => { Haptics.selectionAsync(); setCurrentScreen('Cart'); }}>
             <View>
-              <Text style={{fontSize: 22, marginBottom: 4, opacity: currentScreen === 'Cart' ? 1 : 0.5}}>🛒</Text>
-              {Object.keys(useStore.getState().cart).length > 0 && (
-                <View style={styles.cartBadge} />
-              )}
+              <Text style={{ fontSize: 22, marginBottom: 4, opacity: currentScreen === 'Cart' ? 1 : 0.5 }}>🛒</Text>
+              {Object.keys(useStore.getState().cart).length > 0 && <View style={styles.cartBadge} />}
             </View>
             <Text style={[styles.tabText, currentScreen === 'Cart' && styles.tabTextActive]}>Cart</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.tabItem} onPress={() => { Haptics.selectionAsync(); setCurrentScreen('Profile'); }}>
-            <Text style={{fontSize: 22, marginBottom: 4, opacity: currentScreen === 'Profile' ? 1 : 0.5}}>👤</Text>
+            <Text style={{ fontSize: 22, marginBottom: 4, opacity: currentScreen === 'Profile' ? 1 : 0.5 }}>👤</Text>
             <Text style={[styles.tabText, currentScreen === 'Profile' && styles.tabTextActive]}>Profile</Text>
           </TouchableOpacity>
         </View>
@@ -1143,5 +1345,66 @@ const styles = StyleSheet.create({
   tabItem: { flex: 1, alignItems: 'center', position: 'relative' },
   tabText: { color: '#94a3b8', fontWeight: '700', fontSize: 12, marginTop: 4 },
   tabTextActive: { color: '#0f172a', fontWeight: '900' },
-  cartBadge: { position: 'absolute', top: -4, right: -8, width: 12, height: 12, backgroundColor: '#ef4444', borderRadius: 6, borderWidth: 2, borderColor: '#fff' }
+  cartBadge: { position: 'absolute', top: -4, right: -8, width: 12, height: 12, backgroundColor: '#ef4444', borderRadius: 6, borderWidth: 2, borderColor: '#fff' },
+
+  // Home Screen
+  homeHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 12, paddingTop: 8 },
+  homeGreeting: { fontSize: 14, color: '#64748b', fontWeight: '600' },
+  homeStoreName: { fontSize: 22, fontWeight: '900', color: '#0f172a', letterSpacing: -0.5 },
+  homeSearchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', marginHorizontal: 16, marginBottom: 16, padding: 18, borderRadius: 20, borderWidth: 1, borderColor: '#e2e8f0', ...SHADOWS.sm },
+  homeSearchPlaceholder: { color: '#94a3b8', fontSize: 16, fontWeight: '600' },
+  promoBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0f172a', marginHorizontal: 16, marginBottom: 24, padding: 24, borderRadius: 24, ...SHADOWS.md },
+  promoBannerTitle: { color: '#ffffff', fontSize: 18, fontWeight: '900', marginBottom: 6, letterSpacing: -0.3 },
+  promoBannerSub: { color: '#94a3b8', fontSize: 13, fontWeight: '500', lineHeight: 18, marginBottom: 16 },
+  promoBannerBtn: { backgroundColor: '#4f46e5', paddingVertical: 10, paddingHorizontal: 20, borderRadius: 14, alignSelf: 'flex-start' },
+  promoBannerBtnText: { color: '#ffffff', fontWeight: '800', fontSize: 14 },
+  homeSectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, marginBottom: 12 },
+  homeSectionTitle: { fontSize: 20, fontWeight: '900', color: '#0f172a', letterSpacing: -0.3 },
+  seeAllText: { color: '#4f46e5', fontWeight: '700', fontSize: 14 },
+  homeCategoryGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12, marginBottom: 8 },
+  homeCategoryItem: { width: '18%', margin: '1%', aspectRatio: 0.85, borderRadius: 16, alignItems: 'center', justifyContent: 'center', padding: 8 },
+  homeCategoryIcon: { fontSize: 28, marginBottom: 6 },
+  homeCategoryText: { fontSize: 11, fontWeight: '700', color: '#0f172a', textAlign: 'center' },
+  featuredCard: { backgroundColor: '#ffffff', width: 148, marginRight: 12, borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: '#f1f5f9', ...SHADOWS.sm },
+  featuredCardImage: { width: '100%', height: 110, backgroundColor: '#f1f5f9' },
+  featuredCardName: { fontSize: 13, fontWeight: '800', color: '#0f172a', margin: 10, marginBottom: 2, lineHeight: 18 },
+  featuredCardCompany: { fontSize: 11, color: '#64748b', fontWeight: '600', marginHorizontal: 10, marginBottom: 4 },
+  featuredCardPrice: { fontSize: 15, fontWeight: '900', color: '#4f46e5', margin: 10, marginTop: 2, marginBottom: 12 },
+
+  // Catalog search + filter
+  searchRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 0, gap: 10 },
+  filterBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#ffffff', paddingHorizontal: 16, paddingVertical: 18, borderRadius: 20, borderWidth: 1, borderColor: '#e2e8f0', ...SHADOWS.sm },
+  filterBtnActive: { backgroundColor: '#4f46e5', borderColor: '#4f46e5' },
+  filterBtnText: { fontWeight: '800', fontSize: 14, color: '#475569' },
+  filterCountBadge: { backgroundColor: '#ef4444', width: 18, height: 18, borderRadius: 9, justifyContent: 'center', alignItems: 'center', position: 'absolute', top: -6, right: -6 },
+  filterCountText: { color: '#fff', fontSize: 10, fontWeight: '900' },
+  activeChip: { backgroundColor: '#e0e7ff', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginRight: 8, borderWidth: 1, borderColor: '#c7d2fe' },
+  activeChipText: { color: '#4f46e5', fontWeight: '700', fontSize: 12 },
+  clearChip: { backgroundColor: '#fee2e2', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginRight: 8 },
+  clearChipText: { color: '#dc2626', fontWeight: '700', fontSize: 12 },
+
+  // Product card with thumbnail
+  productThumb: { width: 72, height: 72, borderRadius: 16, marginRight: 14, backgroundColor: '#f1f5f9' },
+
+  // Product detail modal
+  detailImage: { width: '100%', height: 200, borderRadius: 20, marginBottom: 20, backgroundColor: '#f1f5f9' },
+  detailInfoBox: { backgroundColor: '#f8fafc', padding: 16, borderRadius: 16, marginBottom: 12 },
+  detailInfoLabel: { fontSize: 11, fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
+  detailInfoValue: { fontSize: 15, color: '#0f172a', fontWeight: '600', lineHeight: 22 },
+
+  // Filter panel
+  filterPanelHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  clearAllText: { color: '#ef4444', fontWeight: '800', fontSize: 14 },
+  filterSectionTitle: { fontSize: 13, fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 20, marginBottom: 12 },
+  filterRadioRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, gap: 12 },
+  radioOuter: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#cbd5e1', justifyContent: 'center', alignItems: 'center' },
+  radioOuterActive: { borderColor: '#4f46e5' },
+  radioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#4f46e5' },
+  filterOptionText: { fontSize: 16, color: '#475569', fontWeight: '600' },
+  filterOptionTextActive: { color: '#0f172a', fontWeight: '800' },
+  filterChipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  filterChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: '#f1f5f9', borderWidth: 1, borderColor: '#e2e8f0' },
+  filterChipActive: { backgroundColor: '#e0e7ff', borderColor: '#4f46e5' },
+  filterChipText: { fontSize: 13, fontWeight: '600', color: '#475569' },
+  filterChipTextActive: { color: '#4f46e5', fontWeight: '800' },
 });
