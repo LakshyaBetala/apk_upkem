@@ -7,6 +7,7 @@ import {
   FlatList, Image, Modal, KeyboardAvoidingView, Platform, ScrollView,
   LayoutAnimation, UIManager, Animated, Easing, Keyboard, StatusBar
 } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { create } from 'zustand';
 import Constants from 'expo-constants';
 import * as Print from 'expo-print';
@@ -30,14 +31,25 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 }
 
 const DEFAULT_IP = '192.168.1.100';
-const MIN_ORDER_VALUE = 5000;
+const MIN_ORDER_VALUE = 2000;
 
 // Premium Shadow System
+// UPKEM Brand Colors
+const BRAND = {
+  900: '#0B2618',
+  800: '#1B4332',
+  700: '#2D6A4F',
+  600: '#40916C',
+  500: '#52B788',
+  100: '#D8F3DC',
+  50: '#F0FFF4',
+};
+
 const SHADOWS = {
   sm: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
   md: { shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.08, shadowRadius: 16, elevation: 6 },
   lg: { shadowColor: '#000', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.12, shadowRadius: 24, elevation: 12 },
-  glowIndigo: { shadowColor: '#4f46e5', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 8 },
+  glowGreen: { shadowColor: '#1B4332', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 8 },
   glowEmerald: { shadowColor: '#10b981', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 8 },
   glowRed: { shadowColor: '#ef4444', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 8 }
 };
@@ -138,11 +150,16 @@ const useStore = create((set, get) => ({
   getTokenUrl: () => `http://${get().serverIp}:3000/api/user/token`,
   placeOrder: async (order) => {
     try {
-      await fetch(get().getApiUrl(), {
+      const res = await fetch(get().getApiUrl(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ collection: 'orders', item: order, action: 'create' })
       });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        Alert.alert('Order Failed', err.error || 'Server error. Please try again.');
+        return false;
+      }
     } catch (e) {
       Alert.alert('Connection Error', 'Failed to reach the server. Please verify the IP address.');
       return false;
@@ -165,7 +182,7 @@ async function registerForPushNotificationsAsync() {
       name: 'default',
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#4f46e5',
+      lightColor: '#1B4332',
     });
   }
 
@@ -230,7 +247,7 @@ function SignupScreen({ setCurrentScreen }) {
         <Text style={{color: '#fff', marginTop: 20, marginBottom: 8, fontWeight: '700'}}>User Type</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom: 16}}>
           {['Retailer', 'Clinic', 'Doctor', 'Doctor with Pharmacy'].map(type => (
-            <TouchableOpacity key={type} onPress={() => setForm({...form, user_type: type})} style={{padding: 12, backgroundColor: form.user_type === type ? '#4f46e5' : '#1e293b', borderRadius: 12, marginRight: 8}}>
+            <TouchableOpacity key={type} onPress={() => setForm({...form, user_type: type})} style={{padding: 12, backgroundColor: form.user_type === type ? BRAND[800] : '#1e293b', borderRadius: 12, marginRight: 8}}>
               <Text style={{color: '#fff', fontWeight: '600'}}>{type}</Text>
             </TouchableOpacity>
           ))}
@@ -314,13 +331,18 @@ function LoginScreen({ setCurrentScreen }) {
             <Image source={require('./assets/pharma_logo.jpeg')} style={styles.loginLogo} resizeMode="contain" />
           </View>
           <Text style={styles.companyName}>UPKEM LABS</Text>
-          <Text style={styles.tagline}>B2B Command Network</Text>
+          <Text style={styles.tagline}>PHARMA · DISTRIBUTOR PORTAL</Text>
         </View>
 
         <View style={styles.loginCard}>
           <View style={styles.dragHandle} />
-          <Text style={styles.loginTitle}>Secure Access</Text>
-          <Text style={styles.loginSubtitle}>{otpSent ? 'Enter the 4-digit OTP sent to your phone.' : 'Enter your registered mobile number.'}</Text>
+          <Text style={styles.loginTitle}>{otpSent ? 'Enter the 4-digit code' : 'Sign in to your\ndistributor account.'}</Text>
+          <Text style={styles.loginSubtitle}>{otpSent ? `Sent to +91 ${phone} · ` : 'Enter the phone number registered with Upkem.\nWe\'ll send a 4-digit OTP.'}</Text>
+          {otpSent && (
+            <TouchableOpacity onPress={() => setOtpSent(false)}>
+              <Text style={{color: BRAND[800], fontWeight: '700', fontSize: 14, marginTop: -24, marginBottom: 24}}>Edit</Text>
+            </TouchableOpacity>
+          )}
 
           {!otpSent ? (
             <>
@@ -329,8 +351,9 @@ function LoginScreen({ setCurrentScreen }) {
                 <View style={styles.inputDivider} />
                 <TextInput style={styles.inputField} placeholder="00000 00000" placeholderTextColor="#94a3b8" keyboardType="phone-pad" value={phone} onChangeText={setPhone} maxLength={10} returnKeyType="done" />
               </View>
+              <Text style={{color: '#6B7280', fontSize: 13, marginBottom: 24, lineHeight: 20}}>By continuing you agree to Upkem's <Text style={{textDecorationLine: 'underline', fontWeight: '700'}}>Terms</Text> & <Text style={{textDecorationLine: 'underline', fontWeight: '700'}}>Privacy Policy</Text></Text>
               <AnimatedPressable style={styles.buttonPrimary} onPress={requestOtp}>
-                <Text style={styles.buttonPrimaryText}>Send OTP</Text>
+                <Text style={styles.buttonPrimaryText}>Send OTP  →</Text>
               </AnimatedPressable>
             </>
           ) : (
@@ -346,7 +369,7 @@ function LoginScreen({ setCurrentScreen }) {
           )}
 
           <TouchableOpacity style={{ marginTop: 32 }} onPress={() => setCurrentScreen('Signup')}>
-            <Text style={[styles.configText, {color: '#4f46e5'}]}>NEW USER? REGISTER HERE</Text>
+            <Text style={styles.configText}>New distributor? <Text style={{color: BRAND[800], fontWeight: '900'}}>Request access</Text></Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={{ marginTop: 24 }} onPress={() => setShowConfig(true)}>
@@ -384,14 +407,21 @@ function PendingApprovalScreen({ setCurrentScreen }) {
     <View style={styles.centeredContainer}>
       <StatusBar barStyle="dark-content" />
       <View style={styles.pendingCard}>
-        <View style={styles.iconCircle}>
-          <Text style={{ fontSize: 32 }}>🔒</Text>
+        <View style={[styles.iconCircle, { backgroundColor: BRAND[50], borderWidth: 2, borderColor: BRAND[100] }]}>
+          <Ionicons name="time-outline" size={36} color={BRAND[800]} />
         </View>
-        <Text style={styles.pendingTitle}>Under Review</Text>
-        <Text style={styles.pendingDesc}>Your UPKEM LABS wholesale profile is currently being verified. This process ensures network security.</Text>
-        <AnimatedPressable style={[styles.buttonPrimary, { marginTop: 32, width: '100%', backgroundColor: '#0f172a' }]} onPress={handleLogout}>
-          <Text style={styles.buttonPrimaryText}>Return to Login</Text>
-        </AnimatedPressable>
+        <Text style={styles.pendingTitle}>Waiting for admin approval</Text>
+        <Text style={styles.pendingDesc}>Your request has been received. The Upkem team typically verifies new distributors within <Text style={{fontWeight: '900'}}>24 hours</Text>. You'll get an SMS the moment your account is live.</Text>
+        <View style={{ backgroundColor: BRAND[50], padding: 16, borderRadius: 16, marginTop: 24, width: '100%', flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: BRAND[100] }}>
+          <Ionicons name="call-outline" size={20} color={BRAND[800]} style={{marginRight: 12}} />
+          <View>
+            <Text style={{fontSize: 12, color: '#6B7280', fontWeight: '500'}}>Need it faster? Call your rep</Text>
+            <Text style={{fontSize: 16, fontWeight: '800', color: BRAND[800]}}>+91 80 4567 8900</Text>
+          </View>
+        </View>
+        <TouchableOpacity style={[styles.buttonPrimary, { marginTop: 24, width: '100%', backgroundColor: '#fff', borderWidth: 1.5, borderColor: BRAND[800] }]} onPress={handleLogout}>
+          <Text style={[styles.buttonPrimaryText, {color: BRAND[800]}]}>Use a different number</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -399,22 +429,25 @@ function PendingApprovalScreen({ setCurrentScreen }) {
 
 // --- Home Screen (MedPlus-style) ---
 const HOME_CATEGORIES = [
-  { name: 'Analgesics',       icon: '💊', bg: '#fef3c7' },
-  { name: 'Antibiotics',      icon: '🧬', bg: '#ede9fe' },
-  { name: 'Diabetic Care',    icon: '🩺', bg: '#dcfce7' },
-  { name: 'Allergy',          icon: '🤧', bg: '#e0f2fe' },
-  { name: 'Gastrointestinal', icon: '🫁', bg: '#fce7f3' },
-  { name: 'Vitamins',         icon: '⚡', bg: '#fef9c3' },
-  { name: 'Devices',          icon: '🔬', bg: '#f0fdf4' },
-  { name: 'Syrups',           icon: '🧪', bg: '#fff7ed' },
-  { name: 'First Aid',        icon: '🩹', bg: '#fef2f2' },
-  { name: 'Ointments',        icon: '🧴', bg: '#f8f0ff' },
+  { name: 'Analgesics',       icon: 'medkit-outline',          bg: BRAND[100] },
+  { name: 'Antibiotics',      icon: 'medical-outline',         bg: BRAND[100] },
+  { name: 'Diabetic Care',    icon: 'fitness-outline',         bg: BRAND[100] },
+  { name: 'Allergy',          icon: 'leaf-outline',            bg: BRAND[100] },
+  { name: 'Gastrointestinal', icon: 'nutrition-outline',       bg: BRAND[100] },
+  { name: 'Vitamins',         icon: 'sunny-outline',           bg: BRAND[100] },
+  { name: 'Devices',          icon: 'hardware-chip-outline',   bg: BRAND[100] },
+  { name: 'Syrups',           icon: 'flask-outline',           bg: BRAND[100] },
+  { name: 'First Aid',        icon: 'bandage-outline',         bg: BRAND[100] },
+  { name: 'Ointments',        icon: 'color-fill-outline',      bg: BRAND[100] },
 ];
 
 function HomeScreen({ setCurrentScreen, onCategorySelect }) {
   const products = useStore((s) => s.products);
   const user = useStore((s) => s.user);
+  const orders = useStore((s) => s.orders);
   const featured = products.slice(0, 8);
+  const lastOrder = orders.length > 0 ? orders[0] : null;
+  const availableCredit = user ? (user.credit_limit - user.credit_balance) : 0;
 
   return (
     <View style={styles.screen}>
@@ -422,57 +455,76 @@ function HomeScreen({ setCurrentScreen, onCategorySelect }) {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
         {/* Header */}
         <View style={styles.homeHeader}>
-          <View>
-            <Text style={styles.homeGreeting}>Good {getTimeOfDay()},</Text>
-            <Text style={styles.homeStoreName}>{user?.store_name}</Text>
+          <View style={{flexDirection: 'row', alignItems: 'center'}}>
+            <Image source={require('./assets/pharma_logo.jpeg')} style={styles.headerLogo} />
+            <Text style={{fontSize: 16, fontWeight: '900', color: BRAND[800], marginLeft: 10, letterSpacing: -0.3}}>UPKEM LABS</Text>
           </View>
-          <Image source={require('./assets/pharma_logo.jpeg')} style={styles.headerLogo} />
+          <View style={{flexDirection: 'row', alignItems: 'center', gap: 16}}>
+            <TouchableOpacity>
+              <Ionicons name="notifications-outline" size={24} color="#1A1A1A" />
+            </TouchableOpacity>
+            <View style={{width: 36, height: 36, borderRadius: 18, backgroundColor: BRAND[800], justifyContent: 'center', alignItems: 'center'}}>
+              <Text style={{color: '#fff', fontWeight: '800', fontSize: 14}}>{user?.store_name?.[0] || 'U'}</Text>
+            </View>
+          </View>
         </View>
 
         {/* Search shortcut */}
         <TouchableOpacity style={styles.homeSearchBar} onPress={() => setCurrentScreen('Catalog')} activeOpacity={0.85}>
-          <Text style={{ fontSize: 16, marginRight: 10 }}>🔍</Text>
-          <Text style={styles.homeSearchPlaceholder}>Search medicines, devices…</Text>
+          <Ionicons name="search-outline" size={18} color="#94a3b8" style={{marginRight: 10}} />
+          <Text style={styles.homeSearchPlaceholder}>Search medicines, brands…</Text>
         </TouchableOpacity>
 
-        {/* Promo banner */}
-        <View style={styles.promoBanner}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.promoBannerTitle}>60-Day Credit Line</Text>
-            <Text style={styles.promoBannerSub}>Place orders above ₹{MIN_ORDER_VALUE.toLocaleString('en-IN')} and enjoy B2B credit terms.</Text>
-            <TouchableOpacity style={styles.promoBannerBtn} onPress={() => setCurrentScreen('Catalog')}>
-              <Text style={styles.promoBannerBtnText}>Shop Now →</Text>
-            </TouchableOpacity>
+        {/* Stats Row */}
+        <View style={styles.statsRow}>
+          <View style={styles.statCard}>
+            <Text style={styles.statLabel}>LAST ORDER</Text>
+            <Text style={styles.statValue}>₹{lastOrder ? lastOrder.total?.toLocaleString('en-IN') : '0'}</Text>
+            <Text style={styles.statSub}>{lastOrder ? lastOrder.date : '—'}</Text>
           </View>
-          <Text style={{ fontSize: 48, marginLeft: 12 }}>💳</Text>
+          <View style={styles.statCard}>
+            <Text style={styles.statLabel}>THIS MONTH</Text>
+            <Text style={styles.statValue}>₹{orders.reduce((a, o) => a + (o.total || 0), 0).toLocaleString('en-IN', {notation: 'compact', compactDisplay: 'short'})}</Text>
+            <Text style={styles.statSub}>{orders.length} orders</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statLabel}>CREDIT</Text>
+            <Text style={styles.statValue}>₹{availableCredit.toLocaleString('en-IN', {notation: 'compact', compactDisplay: 'short'})}</Text>
+            <Text style={styles.statSub}>Available</Text>
+          </View>
         </View>
 
-        {/* Shop by Category */}
+        {/* Browse by Category */}
         <View style={styles.homeSectionRow}>
-          <Text style={styles.homeSectionTitle}>Shop by Category</Text>
+          <Text style={styles.homeSectionTitle}>Browse by category</Text>
           <TouchableOpacity onPress={() => { onCategorySelect('All'); setCurrentScreen('Catalog'); }}>
-            <Text style={styles.seeAllText}>See All</Text>
+            <Text style={styles.seeAllText}>See all</Text>
           </TouchableOpacity>
         </View>
-        <View style={styles.homeCategoryGrid}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 8, gap: 16 }}>
           {HOME_CATEGORIES.map((cat) => (
             <TouchableOpacity
               key={cat.name}
-              style={[styles.homeCategoryItem, { backgroundColor: cat.bg }]}
+              style={styles.homeCategoryItem}
               onPress={() => { Haptics.selectionAsync(); onCategorySelect(cat.name); setCurrentScreen('Catalog'); }}
               activeOpacity={0.8}
             >
-              <Text style={styles.homeCategoryIcon}>{cat.icon}</Text>
-              <Text style={styles.homeCategoryText} numberOfLines={2}>{cat.name}</Text>
+              <View style={[styles.homeCategoryCircle, { backgroundColor: BRAND[800] }]}>
+                <Ionicons name={cat.icon} size={22} color="#fff" />
+              </View>
+              <Text style={styles.homeCategoryText} numberOfLines={1}>{cat.name}</Text>
             </TouchableOpacity>
           ))}
-        </View>
+        </ScrollView>
 
-        {/* Featured Products */}
-        <View style={styles.homeSectionRow}>
-          <Text style={styles.homeSectionTitle}>Featured Products</Text>
+        {/* Frequently Ordered */}
+        <View style={[styles.homeSectionRow, {marginTop: 8}]}>
+          <View>
+            <Text style={styles.homeSectionTitle}>Frequently ordered</Text>
+            <Text style={{fontSize: 12, color: '#6B7280', fontWeight: '500'}}>Based on last 30 days</Text>
+          </View>
           <TouchableOpacity onPress={() => { onCategorySelect('All'); setCurrentScreen('Catalog'); }}>
-            <Text style={styles.seeAllText}>View All</Text>
+            <Text style={styles.seeAllText}>View all</Text>
           </TouchableOpacity>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 8 }}>
@@ -486,10 +538,40 @@ function HomeScreen({ setCurrentScreen, onCategorySelect }) {
               <Image source={{ uri: getProductImage(p) }} style={styles.featuredCardImage} />
               <Text style={styles.featuredCardName} numberOfLines={2}>{p.name}</Text>
               <Text style={styles.featuredCardCompany} numberOfLines={1}>{p.company}</Text>
-              <Text style={styles.featuredCardPrice}>₹{p.price_ptr || p.price}</Text>
+              <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: 10, marginBottom: 10}}>
+                <Text style={styles.featuredCardPrice}>₹{p.price_ptr || p.price}</Text>
+                <View style={{backgroundColor: '#dcfce7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6}}>
+                  <Text style={{fontSize: 10, color: '#16a34a', fontWeight: '700'}}>● In stock</Text>
+                </View>
+              </View>
             </TouchableOpacity>
           ))}
         </ScrollView>
+
+        {/* Recently Ordered */}
+        {lastOrder && (
+          <>
+            <View style={[styles.homeSectionRow, {marginTop: 8}]}>
+              <View>
+                <Text style={styles.homeSectionTitle}>Recently ordered</Text>
+                <Text style={{fontSize: 12, color: '#6B7280', fontWeight: '500'}}>From order {lastOrder.id}</Text>
+              </View>
+              <TouchableOpacity onPress={() => setCurrentScreen('Profile')}>
+                <Text style={styles.seeAllText}>View all</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 8 }}>
+              {(lastOrder.items || []).slice(0, 4).map((item, idx) => (
+                <View key={idx} style={[styles.featuredCard, {width: 160}]}>
+                  <Image source={{ uri: getProductImage(item) }} style={styles.featuredCardImage} />
+                  <Text style={styles.featuredCardName} numberOfLines={2}>{item.name}</Text>
+                  <Text style={styles.featuredCardCompany} numberOfLines={1}>{item.company}</Text>
+                  <Text style={[styles.featuredCardPrice, {marginBottom: 10}]}>₹{item.price_ptr || item.price}</Text>
+                </View>
+              ))}
+            </ScrollView>
+          </>
+        )}
       </ScrollView>
     </View>
   );
@@ -572,7 +654,7 @@ function CatalogScreen({ setCurrentScreen, initialCategory }) {
             {/* Search + Filter button row */}
             <View style={styles.searchRow}>
               <View style={[styles.searchContainer, { flex: 1 }]}>
-                <Text style={{ position: 'absolute', left: 16, zIndex: 2, fontSize: 16 }}>🔍</Text>
+                <Ionicons name="search-outline" size={18} color="#94a3b8" style={{ position: 'absolute', left: 16, zIndex: 2 }} />
                 <TextInput
                   style={styles.searchInput}
                   placeholder="Search SKUs, brands, composition..."
@@ -585,7 +667,7 @@ function CatalogScreen({ setCurrentScreen, initialCategory }) {
                 style={[styles.filterBtn, activeFilterCount > 0 && styles.filterBtnActive]}
                 onPress={() => setShowFilterPanel(true)}
               >
-                <Text style={{ fontSize: 14 }}>⚡</Text>
+              <Ionicons name="options-outline" size={16} color={activeFilterCount > 0 ? '#fff' : '#475569'} />
                 <Text style={[styles.filterBtnText, activeFilterCount > 0 && { color: '#fff' }]}>Filter</Text>
                 {activeFilterCount > 0 && (
                   <View style={styles.filterCountBadge}>
@@ -663,7 +745,8 @@ function CatalogScreen({ setCurrentScreen, initialCategory }) {
         )}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={{ fontSize: 32, marginBottom: 8 }}>📦</Text>
+            <Text style={{ fontSize: 32, marginBottom: 8 }}></Text>
+            <Ionicons name="cube-outline" size={40} color="#94a3b8" style={{marginBottom: 8}} />
             <Text style={styles.emptyText}>No products found.</Text>
           </View>
         }
@@ -725,7 +808,7 @@ function CatalogScreen({ setCurrentScreen, initialCategory }) {
             <View style={styles.dragHandle} />
             <View style={styles.filterPanelHeader}>
               <Text style={styles.modalTitle}>Filters</Text>
-              <TouchableOpacity onPress={clearAllFilters}><Text style={styles.clearAllText}>Clear All</Text></TouchableOpacity>
+              <TouchableOpacity onPress={clearAllFilters}><Text style={styles.clearAllText}>Reset all</Text></TouchableOpacity>
             </View>
             <ScrollView showsVerticalScrollIndicator={false}>
               {/* Sort */}
@@ -743,18 +826,42 @@ function CatalogScreen({ setCurrentScreen, initialCategory }) {
                 </TouchableOpacity>
               ))}
 
-              {/* Category */}
-              <Text style={styles.filterSectionTitle}>Medical Category</Text>
+              {/* Company (multi-select with checkmarks) */}
+              <Text style={styles.filterSectionTitle}>Company</Text>
               <View style={styles.filterChipsWrap}>
-                {categories.map(cat => (
-                  <TouchableOpacity
-                    key={cat}
-                    style={[styles.filterChip, selectedCategories.includes(cat) && styles.filterChipActive]}
-                    onPress={() => toggleCategory(cat)}
-                  >
-                    <Text style={[styles.filterChipText, selectedCategories.includes(cat) && styles.filterChipTextActive]}>{cat}</Text>
-                  </TouchableOpacity>
-                ))}
+                {companies.filter(c => c !== 'All').map(c => {
+                  const isSelected = selectedCompany === c;
+                  return (
+                    <TouchableOpacity
+                      key={c}
+                      style={[styles.filterChip, isSelected && styles.filterChipActive]}
+                      onPress={() => { Haptics.selectionAsync(); setSelectedCompany(isSelected ? 'All' : c); }}
+                    >
+                      <Text style={[styles.filterChipText, isSelected && styles.filterChipTextActive]}>
+                        {isSelected ? '✓ ' : ''}{c}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Category (with Ionicons) */}
+              <Text style={styles.filterSectionTitle}>Category</Text>
+              <View style={styles.filterChipsWrap}>
+                {categories.map(cat => {
+                  const catConfig = HOME_CATEGORIES.find(hc => hc.name === cat);
+                  const isSelected = selectedCategories.includes(cat);
+                  return (
+                    <TouchableOpacity
+                      key={cat}
+                      style={[styles.filterChip, isSelected && styles.filterChipActive, { flexDirection: 'row', alignItems: 'center', gap: 6 }]}
+                      onPress={() => toggleCategory(cat)}
+                    >
+                      {catConfig && <Ionicons name={catConfig.icon} size={14} color={isSelected ? BRAND[800] : '#64748b'} />}
+                      <Text style={[styles.filterChipText, isSelected && styles.filterChipTextActive]}>{cat}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
 
               {/* Body System */}
@@ -774,33 +881,30 @@ function CatalogScreen({ setCurrentScreen, initialCategory }) {
                   </View>
                 </>
               )}
-
-              {/* Manufacturer */}
-              <Text style={styles.filterSectionTitle}>Manufacturer</Text>
-              <View style={styles.filterChipsWrap}>
-                {companies.map(c => (
-                  <TouchableOpacity
-                    key={c}
-                    style={[styles.filterChip, selectedCompany === c && styles.filterChipActive]}
-                    onPress={() => { Haptics.selectionAsync(); setSelectedCompany(c); }}
-                  >
-                    <Text style={[styles.filterChipText, selectedCompany === c && styles.filterChipTextActive]}>{c}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+              <View style={{ height: 24 }} />
             </ScrollView>
-            <AnimatedPressable style={[styles.buttonPrimary, { marginTop: 16 }]} onPress={() => setShowFilterPanel(false)}>
-              <Text style={styles.buttonPrimaryText}>
-                {activeFilterCount > 0 ? `Apply Filters (${activeFilterCount} active)` : 'Apply'}
-              </Text>
-            </AnimatedPressable>
+            {/* Footer: Reset + Apply */}
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
+              <TouchableOpacity 
+                style={{ flex: 1, paddingVertical: 18, borderRadius: 16, alignItems: 'center', borderWidth: 1.5, borderColor: '#e2e8f0' }} 
+                onPress={() => { clearAllFilters(); setShowFilterPanel(false); }}
+              >
+                <Text style={{ fontWeight: '700', fontSize: 15, color: '#475569' }}>Reset</Text>
+              </TouchableOpacity>
+              <AnimatedPressable 
+                style={{ flex: 1, paddingVertical: 18, borderRadius: 16, alignItems: 'center', backgroundColor: BRAND[800] }} 
+                onPress={() => setShowFilterPanel(false)}
+              >
+                <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>Apply filters</Text>
+              </AnimatedPressable>
+            </View>
           </View>
         </View>
       </Modal>
 
       {Object.keys(cart).length > 0 && (
         <AnimatedPressable 
-          style={[styles.smartCartTracker, isMinMet ? SHADOWS.glowEmerald : SHADOWS.glowIndigo]}
+          style={[styles.smartCartTracker, isMinMet ? SHADOWS.glowEmerald : SHADOWS.glowGreen]}
           onPress={() => { Haptics.selectionAsync(); setCurrentScreen('Cart'); }}
         >
           <View style={{ flex: 1, marginRight: 16 }}>
@@ -808,11 +912,11 @@ function CatalogScreen({ setCurrentScreen, initialCategory }) {
               {isMinMet ? `₹${totalValue.toLocaleString('en-IN')} Ready to Checkout` : `₹${totalValue.toLocaleString('en-IN')} / ₹${MIN_ORDER_VALUE.toLocaleString('en-IN')} Min`}
             </Text>
             <View style={styles.smartCartProgressBg}>
-              <View style={[styles.smartCartProgressFill, { width: `${progressPercent}%`, backgroundColor: isMinMet ? '#34d399' : '#818cf8' }]} />
+              <View style={[styles.smartCartProgressFill, { width: `${progressPercent}%`, backgroundColor: isMinMet ? '#34d399' : BRAND[500] }]} />
             </View>
           </View>
           <View style={[styles.smartCartBtn, isMinMet ? { backgroundColor: '#10b981' } : {}]}>
-            <Text style={styles.smartCartBtnText}>➔</Text>
+            <Ionicons name="arrow-forward" size={20} color="#ffffff" />
           </View>
         </AnimatedPressable>
       )}
@@ -820,62 +924,36 @@ function CatalogScreen({ setCurrentScreen, initialCategory }) {
   );
 }
 
-// --- Cart Screen ---
+// --- Cart Screen (Spec 12/13) ---
 function CartScreen({ setCurrentScreen }) {
   const cart = useStore((state) => state.cart);
   const products = useStore((state) => state.products);
-  const placeOrder = useStore((state) => state.placeOrder);
   const addToCart = useStore((state) => state.addToCart);
   const removeFromCart = useStore((state) => state.removeFromCart);
   const setCartQuantity = useStore((state) => state.setCartQuantity);
   const user = useStore((state) => state.user);
-  const [showQR, setShowQR] = useState(false);
-  const [isPlacing, setIsPlacing] = useState(false);
 
   const cartItems = Object.keys(cart).map(id => {
     const product = products.find(p => p.id === parseInt(id));
     return { ...product, quantity: cart[id] };
-  });
+  }).filter(i => i.id);
 
-  const totalValue = cartItems.reduce((acc, item) => acc + (item.price || 0) * item.quantity, 0);
-  const isMinMet = totalValue >= MIN_ORDER_VALUE;
+  const subtotal = cartItems.reduce((acc, item) => acc + (item.price || 0) * item.quantity, 0);
+  const gst = Math.round(subtotal * 0.12 * 100) / 100;
+  const totalValue = Math.round((subtotal + gst) * 100) / 100;
+  const isMinMet = subtotal >= MIN_ORDER_VALUE;
+  const amountNeeded = MIN_ORDER_VALUE - subtotal;
 
-  const handlePlaceOrder = async () => {
-    Haptics.selectionAsync();
-    if (user.credit_balance + totalValue > user.credit_limit) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert("Credit Limit Exceeded", "Please settle previous invoices or contact admin.");
-      return;
-    }
-    
-    setIsPlacing(true);
-    const newOrder = {
-      id: 'UPK' + Math.floor(Math.random() * 1000000),
-      date: new Date().toLocaleDateString('en-GB'), // DD/MM/YYYY
-      store: user.store_name,
-      phone: user.phone,
-      items: cartItems,
-      total: totalValue,
-      status: 'Placed'
-    };
-
-    const success = await placeOrder(newOrder);
-    setIsPlacing(false);
-    
-    if (success) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert("Order Processed", "Your wholesale order has been successfully placed. Standard 60-Day Credit Period applies.", [
-        { text: "View Orders", onPress: () => setCurrentScreen('Profile') },
-        { text: "Pay Now (QR)", onPress: () => setShowQR(true) }
-      ]);
-    }
+  const deleteFromCart = (id) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setCartQuantity(id, 0);
   };
 
   if (cartItems.length === 0) {
     return (
       <View style={styles.centeredContainer}>
-        <View style={styles.iconCircleLg}><Text style={{ fontSize: 40 }}>🛒</Text></View>
-        <Text style={{ fontSize: 24, fontWeight: '800', color: '#0f172a', letterSpacing: -0.5 }}>Cart is Empty</Text>
+        <View style={styles.iconCircleLg}><Ionicons name="cart-outline" size={40} color={BRAND[800]} /></View>
+        <Text style={{ fontSize: 24, fontWeight: '800', color: '#1A1A1A', letterSpacing: -0.5 }}>Cart is Empty</Text>
         <Text style={{ color: '#64748b', marginTop: 8, fontSize: 16 }}>Return to the catalog to add SKUs.</Text>
       </View>
     );
@@ -883,72 +961,505 @@ function CartScreen({ setCurrentScreen }) {
 
   return (
     <View style={styles.screen}>
-      <Text style={styles.pageTitle}>Order Review</Text>
-      <FlatList
-        contentContainerStyle={{ padding: 16, paddingBottom: 220 }}
-        keyboardShouldPersistTaps="handled"
-        data={cartItems}
-        keyExtractor={item => item.id.toString()}
-        renderItem={({ item }) => (
-          <View style={styles.cartItemCard}>
-            <View style={{ flex: 1, paddingRight: 16 }}>
-              <Text style={styles.productName}>{item.name}</Text>
-              <Text style={styles.productPrice}>₹{item.price} <Text style={{color:'#94a3b8', fontSize: 13, fontWeight: '600'}}>x {item.quantity}</Text></Text>
-            </View>
-            <View style={styles.cartItemQtyControls}>
-              <TouchableOpacity style={styles.qtyBtn} onPress={() => removeFromCart(item.id)}><Text style={styles.qtyBtnText}>-</Text></TouchableOpacity>
-              <TextInput
-                style={styles.qtyInput}
-                keyboardType="numeric"
-                selectTextOnFocus
-                value={item.quantity.toString()}
-                onChangeText={(val) => {
-                  if (val === '') setCartQuantity(item.id, 0);
-                  else setCartQuantity(item.id, parseInt(val) || 1);
-                }}
-              />
-              <TouchableOpacity style={styles.qtyBtn} onPress={() => addToCart(item.id)}><Text style={styles.qtyBtnText}>+</Text></TouchableOpacity>
+      <StatusBar barStyle="dark-content" />
+      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 4, paddingTop: 8 }}>
+        <TouchableOpacity onPress={() => setCurrentScreen('Catalog')} style={{ marginRight: 12, padding: 4 }}>
+          <Ionicons name="chevron-back" size={24} color="#1A1A1A" />
+        </TouchableOpacity>
+        <View>
+          <Text style={{ fontSize: 22, fontWeight: '900', color: '#1A1A1A', letterSpacing: -0.5 }}>Your cart</Text>
+          <Text style={{ fontSize: 13, color: '#64748b', fontWeight: '600' }}>{cartItems.length} items</Text>
+        </View>
+      </View>
+
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 240 }} showsVerticalScrollIndicator={false}>
+        {cartItems.map(item => (
+          <View key={item.id} style={{ backgroundColor: '#fff', borderRadius: 16, marginBottom: 12, flexDirection: 'row', borderWidth: 1, borderColor: '#f1f5f9', overflow: 'hidden', ...SHADOWS.sm }}>
+            <View style={{ width: 4, backgroundColor: BRAND[800] }} />
+            <View style={{ flex: 1, padding: 16 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <View style={{ flex: 1, paddingRight: 12 }}>
+                  <Text style={{ fontSize: 16, fontWeight: '800', color: '#1A1A1A', marginBottom: 2 }}>{item.name}</Text>
+                  <Text style={{ fontSize: 12, color: '#64748b', fontWeight: '500' }}>{item.composition || item.company}</Text>
+                  <Text style={{ fontSize: 11, color: '#94a3b8', fontWeight: '500', marginTop: 2 }}>{item.packing || '10 Tab'} · MRP {item.mrp || Math.round((item.price_ptr || item.price) * 1.2)}</Text>
+                </View>
+                <TouchableOpacity onPress={() => deleteFromCart(item.id)} style={{ padding: 4 }}>
+                  <Ionicons name="trash-outline" size={18} color="#94a3b8" />
+                </TouchableOpacity>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                  <TouchableOpacity style={{ paddingHorizontal: 14, paddingVertical: 10 }} onPress={() => removeFromCart(item.id)}>
+                    <Text style={{ fontSize: 18, fontWeight: '700', color: BRAND[800] }}>−</Text>
+                  </TouchableOpacity>
+                  <TextInput
+                    style={{ width: 36, textAlign: 'center', fontSize: 15, fontWeight: '800', color: '#1A1A1A', paddingVertical: 8 }}
+                    keyboardType="numeric"
+                    selectTextOnFocus
+                    value={item.quantity.toString()}
+                    onChangeText={(val) => {
+                      if (val === '') setCartQuantity(item.id, 0);
+                      else setCartQuantity(item.id, parseInt(val) || 1);
+                    }}
+                  />
+                  <TouchableOpacity style={{ paddingHorizontal: 14, paddingVertical: 10 }} onPress={() => addToCart(item.id)}>
+                    <Text style={{ fontSize: 18, fontWeight: '700', color: BRAND[800] }}>+</Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={{ fontSize: 17, fontWeight: '900', color: '#1A1A1A' }}>₹{(item.price * item.quantity).toLocaleString('en-IN')}</Text>
+              </View>
             </View>
           </View>
-        )}
-      />
-      <View style={styles.checkoutFooter}>
-        <View style={styles.billRow}>
-          <Text style={styles.billLabel}>Total Payable</Text>
-          <Text style={styles.billTotal}>₹{totalValue.toLocaleString('en-IN')}</Text>
+        ))}
+
+        {/* Bill Summary */}
+        <View style={{ marginTop: 16 }}>
+          <Text style={{ fontSize: 13, fontWeight: '800', color: '#1A1A1A', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 16 }}>Bill Summary</Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
+            <Text style={{ fontSize: 15, color: '#64748b', fontWeight: '500' }}>Subtotal</Text>
+            <Text style={{ fontSize: 15, color: '#1A1A1A', fontWeight: '700' }}>₹{subtotal.toLocaleString('en-IN')}</Text>
+          </View>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
+            <Text style={{ fontSize: 15, color: '#64748b', fontWeight: '500' }}>GST (12%)</Text>
+            <Text style={{ fontSize: 15, color: '#1A1A1A', fontWeight: '700' }}>₹{gst.toLocaleString('en-IN')}</Text>
+          </View>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
+            <Text style={{ fontSize: 15, color: '#64748b', fontWeight: '500' }}>Delivery</Text>
+            <Text style={{ fontSize: 15, color: BRAND[600], fontWeight: '700' }}>Free</Text>
+          </View>
+          <View style={{ borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 16, flexDirection: 'row', justifyContent: 'space-between' }}>
+            <Text style={{ fontSize: 16, fontWeight: '800', color: '#1A1A1A' }}>Total</Text>
+            <Text style={{ fontSize: 22, fontWeight: '900', color: '#1A1A1A', letterSpacing: -0.5 }}>₹{totalValue.toLocaleString('en-IN')}</Text>
+          </View>
         </View>
+      </ScrollView>
+
+      {/* Bottom CTA — positioned ABOVE tab bar */}
+      <View style={{ position: 'absolute', bottom: 76, left: 0, right: 0, backgroundColor: '#fff', padding: 16, paddingBottom: 16, borderTopLeftRadius: 24, borderTopRightRadius: 24, ...SHADOWS.lg }}>
         {!isMinMet && (
-          <View style={styles.minOrderAlert}>
-            <Text style={{fontSize: 14, marginRight: 6}}>⚠️</Text>
-            <Text style={styles.minOrderAlertText}>Minimum threshold not met: ₹{MIN_ORDER_VALUE.toLocaleString('en-IN')}</Text>
+          <View style={{ backgroundColor: '#FFF7ED', padding: 12, borderRadius: 12, marginBottom: 12, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#FED7AA' }}>
+            <Ionicons name="warning-outline" size={16} color="#EA580C" style={{ marginRight: 8 }} />
+            <Text style={{ color: '#9A3412', fontSize: 13, fontWeight: '600', flex: 1 }}>
+              Minimum order ₹{MIN_ORDER_VALUE.toLocaleString('en-IN')} required. Add ₹{amountNeeded.toLocaleString('en-IN')} more.
+            </Text>
           </View>
         )}
         <AnimatedPressable
-          style={[styles.checkoutBtn, !isMinMet && styles.checkoutBtnDisabled, isMinMet && SHADOWS.glowIndigo]}
-          disabled={!isMinMet || isPlacing} 
-          onPress={handlePlaceOrder}
+          style={[
+            { paddingVertical: 18, borderRadius: 16, alignItems: 'center' },
+            isMinMet ? { backgroundColor: BRAND[800], ...SHADOWS.glowGreen } : { backgroundColor: '#E5E7EB' }
+          ]}
+          disabled={!isMinMet}
+          onPress={() => { Haptics.selectionAsync(); setCurrentScreen('Review'); }}
         >
-          <Text style={styles.checkoutBtnText}>{isPlacing ? 'Processing...' : 'Place Wholesale Order'}</Text>
+          <Text style={{ color: isMinMet ? '#fff' : '#9CA3AF', fontSize: 16, fontWeight: '800' }}>
+            {isMinMet ? `Review order · ₹${totalValue.toLocaleString('en-IN')}` : `Add ₹${amountNeeded.toLocaleString('en-IN')} more`}
+          </Text>
         </AnimatedPressable>
       </View>
-
-      <Modal visible={showQR} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Manual Settlement</Text>
-            <Image source={{ uri: 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=UPKEM-LABS-PAYMENT' }} style={{ width: 200, height: 200, marginVertical: 32, alignSelf: 'center', borderRadius: 16 }} />
-            <Text style={{ textAlign: 'center', color: '#64748b', marginBottom: 32, lineHeight: 22, fontSize: 15 }}>Scan using any UPI application to settle your invoice immediately.</Text>
-            <AnimatedPressable onPress={() => setShowQR(false)} style={styles.btnSave}>
-              <Text style={{ color: '#fff', fontWeight: '800', textAlign: 'center', fontSize: 16 }}>Complete</Text>
-            </AnimatedPressable>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
 
-// --- Profile Screen ---
+// --- Review & Confirm Screen (Spec 14) ---
+function ReviewConfirmScreen({ setCurrentScreen }) {
+  const cart = useStore((state) => state.cart);
+  const products = useStore((state) => state.products);
+  const placeOrder = useStore((state) => state.placeOrder);
+  const user = useStore((state) => state.user);
+  const [isPlacing, setIsPlacing] = useState(false);
+  const [placedOrder, setPlacedOrder] = useState(null);
+
+  const cartItems = Object.keys(cart).map(id => {
+    const product = products.find(p => p.id === parseInt(id));
+    return { ...product, quantity: cart[id] };
+  }).filter(i => i.id);
+
+  const subtotal = cartItems.reduce((acc, item) => acc + (item.price || 0) * item.quantity, 0);
+  const gst = Math.round(subtotal * 0.12 * 100) / 100;
+  const totalValue = Math.round((subtotal + gst) * 100) / 100;
+  const creditAvailable = (user.credit_limit || 0) - (user.credit_balance || 0);
+  const hasEnoughCredit = creditAvailable >= totalValue;
+
+  const handlePlaceOrder = async () => {
+    Haptics.selectionAsync();
+    if (!hasEnoughCredit) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert("Credit Limit Exceeded", `You need ₹${totalValue.toLocaleString('en-IN')} but only have ₹${creditAvailable.toLocaleString('en-IN')} available. Please settle previous invoices.`);
+      return;
+    }
+
+    setIsPlacing(true);
+    const newOrder = {
+      id: 'UPK-' + Math.floor(1000 + Math.random() * 9000),
+      date: new Date().toLocaleDateString('en-GB'),
+      store: user.store_name,
+      phone: user.phone,
+      items: cartItems,
+      total: totalValue,
+      subtotal: subtotal,
+      gst: gst,
+      status: 'Placed',
+      created_at: new Date().toISOString(),
+    };
+
+    const success = await placeOrder(newOrder);
+    setIsPlacing(false);
+    if (success) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setPlacedOrder(newOrder);
+    }
+  };
+
+  // --- Order Success (Spec 15) ---
+  if (placedOrder) {
+    return (
+      <View style={styles.centeredContainer}>
+        <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: BRAND[800], justifyContent: 'center', alignItems: 'center', marginBottom: 24 }}>
+          <Ionicons name="checkmark" size={40} color="#fff" />
+        </View>
+        <Text style={{ fontSize: 28, fontWeight: '900', color: '#1A1A1A', marginBottom: 12, letterSpacing: -0.5 }}>Order placed!</Text>
+        <Text style={{ fontSize: 15, color: '#64748b', textAlign: 'center', lineHeight: 22, marginBottom: 32, paddingHorizontal: 24 }}>
+          Your order has been received. Our team will{'\n'}accept it shortly. You'll get an SMS update.
+        </Text>
+        <View style={{ backgroundColor: '#f8fafc', borderRadius: 16, padding: 20, flexDirection: 'row', justifyContent: 'space-between', width: '85%', marginBottom: 16, borderWidth: 1, borderColor: '#e2e8f0' }}>
+          <View>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5 }}>Order ID</Text>
+            <Text style={{ fontSize: 18, fontWeight: '900', color: '#1A1A1A', marginTop: 4 }}>{placedOrder.id}</Text>
+          </View>
+          <View style={{ alignItems: 'flex-end' }}>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5 }}>Total</Text>
+            <Text style={{ fontSize: 18, fontWeight: '900', color: '#1A1A1A', marginTop: 4 }}>₹{placedOrder.total.toLocaleString('en-IN')}</Text>
+          </View>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 32 }}>
+          <Ionicons name="checkmark-circle" size={16} color={BRAND[500]} />
+          <Text style={{ color: '#64748b', fontSize: 13, fontWeight: '600', marginLeft: 6 }}>Invoice sent to WhatsApp</Text>
+        </View>
+        <View style={{ flexDirection: 'row', gap: 12, width: '85%' }}>
+          <TouchableOpacity style={{ flex: 1, borderWidth: 1.5, borderColor: BRAND[800], borderRadius: 16, paddingVertical: 16, alignItems: 'center' }} onPress={() => setCurrentScreen('Orders')}>
+            <Text style={{ color: BRAND[800], fontWeight: '800', fontSize: 15 }}>View orders</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={{ flex: 1, backgroundColor: BRAND[800], borderRadius: 16, paddingVertical: 16, alignItems: 'center' }} onPress={() => setCurrentScreen('Home')}>
+            <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>Continue</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.screen}>
+      <StatusBar barStyle="dark-content" />
+      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 4, paddingTop: 8 }}>
+        <TouchableOpacity onPress={() => setCurrentScreen('Cart')} style={{ marginRight: 12, padding: 4 }}>
+          <Ionicons name="chevron-back" size={24} color="#1A1A1A" />
+        </TouchableOpacity>
+        <Text style={{ fontSize: 22, fontWeight: '900', color: '#1A1A1A', letterSpacing: -0.5 }}>Review & confirm</Text>
+      </View>
+
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 180 }} showsVerticalScrollIndicator={false}>
+        {/* Delivery Address */}
+        <Text style={{ fontSize: 11, fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Delivery address</Text>
+        <TouchableOpacity onPress={() => setCurrentScreen('Profile')} style={{ backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 20, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#f1f5f9' }}>
+          <Ionicons name="location-outline" size={20} color={BRAND[800]} style={{ marginRight: 12 }} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: '#1A1A1A' }}>{user.store_name}</Text>
+            <Text style={{ fontSize: 13, color: '#64748b', fontWeight: '500', marginTop: 2 }}>{user.address || 'No address set — tap to add in Profile'}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color="#D1D5DB" />
+        </TouchableOpacity>
+
+        {/* Items Summary */}
+        <Text style={{ fontSize: 11, fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Items ({cartItems.length})</Text>
+        <View style={{ backgroundColor: '#fff', borderRadius: 16, marginBottom: 20, borderWidth: 1, borderColor: '#f1f5f9' }}>
+          {cartItems.map((item, idx) => (
+            <View key={item.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: idx < cartItems.length - 1 ? 1 : 0, borderBottomColor: '#f1f5f9' }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: '#1A1A1A' }}>{item.name}</Text>
+                <Text style={{ fontSize: 12, color: '#94a3b8', fontWeight: '500' }}>x{item.quantity} · ₹{item.price}</Text>
+              </View>
+              <Text style={{ fontSize: 15, fontWeight: '800', color: '#1A1A1A' }}>₹{(item.price * item.quantity).toLocaleString('en-IN')}</Text>
+            </View>
+          ))}
+        </View>
+
+        {/* Bill Summary */}
+        <Text style={{ fontSize: 11, fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Bill summary</Text>
+        <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: '#f1f5f9' }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
+            <Text style={{ fontSize: 14, color: '#64748b', fontWeight: '500' }}>Subtotal</Text>
+            <Text style={{ fontSize: 14, color: '#1A1A1A', fontWeight: '700' }}>₹{subtotal.toLocaleString('en-IN')}</Text>
+          </View>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
+            <Text style={{ fontSize: 14, color: '#64748b', fontWeight: '500' }}>GST (12%)</Text>
+            <Text style={{ fontSize: 14, color: '#1A1A1A', fontWeight: '700' }}>₹{gst.toLocaleString('en-IN')}</Text>
+          </View>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
+            <Text style={{ fontSize: 14, color: '#64748b', fontWeight: '500' }}>Delivery</Text>
+            <Text style={{ fontSize: 14, color: BRAND[600], fontWeight: '700' }}>Free</Text>
+          </View>
+          <View style={{ borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 12, flexDirection: 'row', justifyContent: 'space-between' }}>
+            <Text style={{ fontSize: 16, fontWeight: '800', color: '#1A1A1A' }}>Total</Text>
+            <Text style={{ fontSize: 20, fontWeight: '900', color: '#1A1A1A' }}>₹{totalValue.toLocaleString('en-IN')}</Text>
+          </View>
+        </View>
+
+        {/* Payment Method */}
+        <Text style={{ fontSize: 11, fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Payment method</Text>
+        <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: '#f1f5f9' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+            <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: BRAND[50], justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
+              <Ionicons name="card-outline" size={18} color={BRAND[800]} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: '#1A1A1A' }}>UPKEM Credit Line</Text>
+              <Text style={{ fontSize: 12, color: '#64748b', fontWeight: '500' }}>60-day payment terms</Text>
+            </View>
+            <Ionicons name="checkmark-circle" size={20} color={BRAND[500]} />
+          </View>
+          <View style={{ backgroundColor: '#f8fafc', borderRadius: 10, padding: 10, marginTop: 4 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text style={{ fontSize: 12, color: '#64748b', fontWeight: '600' }}>Available credit</Text>
+              <Text style={{ fontSize: 13, fontWeight: '800', color: hasEnoughCredit ? BRAND[700] : '#dc2626' }}>₹{creditAvailable.toLocaleString('en-IN')}</Text>
+            </View>
+          </View>
+        </View>
+      </ScrollView>
+
+      {/* Place Order CTA */}
+      <View style={{ position: 'absolute', bottom: 76, left: 0, right: 0, backgroundColor: '#fff', padding: 16, borderTopLeftRadius: 24, borderTopRightRadius: 24, ...SHADOWS.lg }}>
+        <AnimatedPressable
+          style={[
+            { paddingVertical: 18, borderRadius: 16, alignItems: 'center' },
+            hasEnoughCredit ? { backgroundColor: BRAND[800], ...SHADOWS.glowGreen } : { backgroundColor: '#E5E7EB' }
+          ]}
+          disabled={!hasEnoughCredit || isPlacing}
+          onPress={handlePlaceOrder}
+        >
+          <Text style={{ color: hasEnoughCredit ? '#fff' : '#9CA3AF', fontSize: 16, fontWeight: '800' }}>
+            {isPlacing ? 'Placing order...' : hasEnoughCredit ? `Place order · ₹${totalValue.toLocaleString('en-IN')}` : 'Insufficient credit'}
+          </Text>
+        </AnimatedPressable>
+      </View>
+    </View>
+  );
+}
+
+// --- Order Tracking Screen (Spec 16) ---
+function OrderTrackingScreen({ setCurrentScreen, order }) {
+  if (!order) {
+    return (
+      <View style={styles.centeredContainer}>
+        <Text style={{ color: '#64748b', fontSize: 16 }}>Order not found.</Text>
+      </View>
+    );
+  }
+
+  const TIMELINE_STEPS = [
+    { key: 'Placed', label: 'Order placed', icon: 'receipt-outline', desc: 'Your order has been received' },
+    { key: 'Accepted', label: 'Accepted', icon: 'checkmark-circle-outline', desc: 'Order confirmed by UPKEM team' },
+    { key: 'Processing', label: 'Processing', icon: 'cube-outline', desc: 'Order is being packed' },
+    { key: 'Shipped', label: 'Shipped', icon: 'car-outline', desc: order.courier_name ? `Via ${order.courier_name}` : 'Dispatched for delivery' },
+    { key: 'Delivered', label: 'Delivered', icon: 'home-outline', desc: 'Order delivered successfully' },
+  ];
+
+  const statusOrder = ['Placed', 'Accepted', 'Processing', 'Shipped', 'Delivered'];
+  const currentIdx = statusOrder.indexOf(order.status);
+  const isRejected = order.status === 'Rejected';
+
+  return (
+    <View style={styles.screen}>
+      <StatusBar barStyle="dark-content" />
+      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 8, paddingTop: 8 }}>
+        <TouchableOpacity onPress={() => setCurrentScreen('Orders')} style={{ marginRight: 12, padding: 4 }}>
+          <Ionicons name="chevron-back" size={24} color="#1A1A1A" />
+        </TouchableOpacity>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 22, fontWeight: '900', color: '#1A1A1A', letterSpacing: -0.5 }}>{order.id}</Text>
+          <Text style={{ fontSize: 13, color: '#64748b', fontWeight: '600' }}>{order.date} · ₹{order.total?.toLocaleString('en-IN')}</Text>
+        </View>
+      </View>
+
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+        {/* Status Banner */}
+        {isRejected ? (
+          <View style={{ backgroundColor: '#fee2e2', borderRadius: 16, padding: 16, marginBottom: 24, flexDirection: 'row', alignItems: 'center' }}>
+            <Ionicons name="close-circle" size={24} color="#dc2626" style={{ marginRight: 12 }} />
+            <View>
+              <Text style={{ fontSize: 16, fontWeight: '800', color: '#dc2626' }}>Order Rejected</Text>
+              <Text style={{ fontSize: 13, color: '#9A3412', fontWeight: '500' }}>Credit has been refunded to your account.</Text>
+            </View>
+          </View>
+        ) : (
+          <View style={{ backgroundColor: BRAND[50], borderRadius: 16, padding: 16, marginBottom: 24, flexDirection: 'row', alignItems: 'center' }}>
+            <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: BRAND[800], justifyContent: 'center', alignItems: 'center', marginRight: 14 }}>
+              <Ionicons name={TIMELINE_STEPS[currentIdx]?.icon || 'time-outline'} size={20} color="#fff" />
+            </View>
+            <View>
+              <Text style={{ fontSize: 16, fontWeight: '800', color: BRAND[800] }}>{order.status}</Text>
+              <Text style={{ fontSize: 13, color: '#64748b', fontWeight: '500' }}>{TIMELINE_STEPS[currentIdx]?.desc}</Text>
+            </View>
+          </View>
+        )}
+
+        {/* Timeline */}
+        {!isRejected && (
+          <View style={{ marginBottom: 24 }}>
+            <Text style={{ fontSize: 11, fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 16 }}>Timeline</Text>
+            {TIMELINE_STEPS.map((step, idx) => {
+              const isCompleted = idx <= currentIdx;
+              const isCurrent = idx === currentIdx;
+              const isLast = idx === TIMELINE_STEPS.length - 1;
+              return (
+                <View key={step.key} style={{ flexDirection: 'row', minHeight: 60 }}>
+                  {/* Dot + Line */}
+                  <View style={{ alignItems: 'center', width: 32 }}>
+                    <View style={{
+                      width: isCurrent ? 28 : 20, height: isCurrent ? 28 : 20, borderRadius: 14,
+                      backgroundColor: isCompleted ? BRAND[800] : '#e2e8f0',
+                      justifyContent: 'center', alignItems: 'center',
+                      borderWidth: isCurrent ? 3 : 0, borderColor: BRAND[100],
+                    }}>
+                      {isCompleted && <Ionicons name="checkmark" size={12} color="#fff" />}
+                    </View>
+                    {!isLast && (
+                      <View style={{ width: 2, flex: 1, backgroundColor: isCompleted && idx < currentIdx ? BRAND[800] : '#e2e8f0', marginVertical: 2 }} />
+                    )}
+                  </View>
+                  {/* Label */}
+                  <View style={{ flex: 1, paddingLeft: 12, paddingBottom: 20 }}>
+                    <Text style={{ fontSize: 15, fontWeight: isCompleted ? '800' : '600', color: isCompleted ? '#1A1A1A' : '#94a3b8' }}>{step.label}</Text>
+                    <Text style={{ fontSize: 12, color: '#94a3b8', fontWeight: '500', marginTop: 2 }}>{step.desc}</Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        {/* Courier Info */}
+        {order.status === 'Shipped' && order.courier_name && (
+          <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: '#f1f5f9' }}>
+            <Text style={{ fontSize: 11, fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Courier details</Text>
+            <Text style={{ fontSize: 15, fontWeight: '800', color: '#1A1A1A' }}>{order.courier_name}</Text>
+            {order.tracking_id && <Text style={{ fontSize: 14, fontWeight: '600', color: BRAND[700], marginTop: 4 }}>Tracking: {order.tracking_id}</Text>}
+          </View>
+        )}
+
+        {/* Order Items */}
+        <Text style={{ fontSize: 11, fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Items</Text>
+        <View style={{ backgroundColor: '#fff', borderRadius: 16, borderWidth: 1, borderColor: '#f1f5f9' }}>
+          {order.items?.map((item, idx) => (
+            <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: idx < order.items.length - 1 ? 1 : 0, borderBottomColor: '#f1f5f9' }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: '#1A1A1A' }}>{item.name}</Text>
+                <Text style={{ fontSize: 12, color: '#94a3b8' }}>x{item.quantity} · ₹{item.price}</Text>
+              </View>
+              <Text style={{ fontSize: 14, fontWeight: '800', color: '#1A1A1A' }}>₹{(item.price * item.quantity).toLocaleString('en-IN')}</Text>
+            </View>
+          ))}
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+
+// --- Order History Screen (Spec 17) ---
+function OrderHistoryScreen({ setCurrentScreen, onSelectOrder }) {
+  const orders = useStore((state) => state.orders);
+  const [activeFilter, setActiveFilter] = useState('All');
+  const filters = ['All', 'Active', 'Completed', 'Cancelled'];
+
+  const getStatusColor = (status) => {
+    switch(status) {
+      case 'Shipped': return { bg: '#ecfdf5', text: '#059669' };
+      case 'Completed': case 'Delivered': return { bg: '#ecfdf5', text: '#059669' };
+      case 'Rejected': case 'Cancelled': return { bg: '#fee2e2', text: '#dc2626' };
+      case 'Processing': return { bg: '#FFF7ED', text: '#EA580C' };
+      default: return { bg: '#f1f5f9', text: '#475569' };
+    }
+  };
+
+  const filteredOrders = orders.filter(o => {
+    if (activeFilter === 'All') return true;
+    if (activeFilter === 'Active') return ['Placed', 'Processing', 'Shipped'].includes(o.status);
+    if (activeFilter === 'Completed') return ['Completed', 'Delivered'].includes(o.status);
+    if (activeFilter === 'Cancelled') return ['Rejected', 'Cancelled'].includes(o.status);
+    return true;
+  });
+
+  return (
+    <View style={styles.screen}>
+      <StatusBar barStyle="dark-content" />
+      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 4, paddingTop: 8 }}>
+        <TouchableOpacity onPress={() => setCurrentScreen('Home')} style={{ marginRight: 12, padding: 4 }}>
+          <Ionicons name="chevron-back" size={24} color="#1A1A1A" />
+        </TouchableOpacity>
+        <View>
+          <Text style={{ fontSize: 22, fontWeight: '900', color: '#1A1A1A', letterSpacing: -0.5 }}>Orders</Text>
+          <Text style={{ fontSize: 13, color: '#64748b', fontWeight: '600' }}>{orders.length} placed · last 30 days</Text>
+        </View>
+      </View>
+
+      {/* Filter pills */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 12, gap: 8 }}>
+        {filters.map(f => (
+          <TouchableOpacity
+            key={f}
+            onPress={() => { Haptics.selectionAsync(); setActiveFilter(f); }}
+            style={{
+              paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20,
+              backgroundColor: activeFilter === f ? BRAND[800] : '#fff',
+              borderWidth: 1, borderColor: activeFilter === f ? BRAND[800] : '#e2e8f0',
+            }}
+          >
+            <Text style={{ fontSize: 13, fontWeight: '700', color: activeFilter === f ? '#fff' : '#475569' }}>{f}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      <FlatList
+        contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+        data={filteredOrders}
+        keyExtractor={item => item.id.toString()}
+        renderItem={({ item }) => {
+          const sc = getStatusColor(item.status);
+          return (
+            <TouchableOpacity onPress={() => { Haptics.selectionAsync(); onSelectOrder && onSelectOrder(item); }} style={{ backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#f1f5f9' }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <Text style={{ fontSize: 16, fontWeight: '900', color: '#1A1A1A' }}>{item.id}</Text>
+                <View style={{ backgroundColor: sc.bg, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '800', color: sc.text, textTransform: 'uppercase' }}>{item.status}</Text>
+                </View>
+              </View>
+              <Text style={{ fontSize: 13, color: '#94a3b8', fontWeight: '500', marginBottom: 12 }}>
+                {item.date} · {item.items?.length || 0} items
+              </Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ fontSize: 13, color: '#64748b', fontWeight: '600' }}>Total</Text>
+                <Text style={{ fontSize: 18, fontWeight: '900', color: '#1A1A1A' }}>₹{item.total?.toLocaleString('en-IN')}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', marginTop: 8 }}>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: BRAND[700], marginRight: 4 }}>Track order</Text>
+                <Ionicons name="chevron-forward" size={14} color={BRAND[700]} />
+              </View>
+            </TouchableOpacity>
+          );
+        }}
+        ListEmptyComponent={
+          <View style={{ alignItems: 'center', marginTop: 60 }}>
+            <Ionicons name="receipt-outline" size={40} color="#94a3b8" style={{ marginBottom: 12 }} />
+            <Text style={{ color: '#64748b', fontSize: 16, fontWeight: '500' }}>No orders found.</Text>
+          </View>
+        }
+      />
+    </View>
+  );
+}
+
+// --- Profile Screen (Spec 18) ---
 function ProfileScreen({ setCurrentScreen }) {
   const user = useStore((state) => state.user);
   const orders = useStore((state) => state.orders);
@@ -972,14 +1483,14 @@ function ProfileScreen({ setCurrentScreen }) {
       <html>
         <head>
           <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; padding: 40px; color: #0f172a; }
-            h1 { color: #1e293b; margin-bottom: 0; font-size: 32px; letter-spacing: -1px; }
-            .header { border-bottom: 2px solid #f1f5f9; padding-bottom: 24px; margin-bottom: 32px; }
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; padding: 40px; color: #1A1A1A; }
+            h1 { color: #1B4332; margin-bottom: 0; font-size: 32px; letter-spacing: -1px; }
+            .header { border-bottom: 2px solid #D8F3DC; padding-bottom: 24px; margin-bottom: 32px; }
             table { width: 100%; border-collapse: collapse; margin-top: 24px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
             th, td { border-bottom: 1px solid #f1f5f9; padding: 16px 20px; text-align: left; }
-            th { background: #f8fafc; font-weight: 700; color: #475569; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; }
-            .total { text-align: right; font-size: 28px; font-weight: 900; margin-top: 32px; color: #0f172a; letter-spacing: -0.5px; }
-            .tagline { color: #4f46e5; font-weight: 700; margin-top: 4px; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; }
+            th { background: #F0FFF4; font-weight: 700; color: #1B4332; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; }
+            .total { text-align: right; font-size: 28px; font-weight: 900; margin-top: 32px; color: #1B4332; letter-spacing: -0.5px; }
+            .tagline { color: #1B4332; font-weight: 700; margin-top: 4px; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; }
             .meta { color: #64748b; font-size: 14px; margin-top: 12px; line-height: 1.6; }
           </style>
         </head>
@@ -995,7 +1506,7 @@ function ProfileScreen({ setCurrentScreen }) {
           </div>
           <table>
             <tr><th>Description</th><th>Qty</th><th>Unit Price</th><th>Amount</th></tr>
-            ${order.items.map(i => `<tr><td><strong style="color: #0f172a;">${i.name}</strong><br/><span style="font-size: 12px; color: #64748b;">${i.company} | ${i.category}</span></td><td>${i.quantity}</td><td>₹${i.price}</td><td><strong style="color: #0f172a;">₹${i.price * i.quantity}</strong></td></tr>`).join('')}
+            ${order.items.map(i => `<tr><td><strong style="color: #1A1A1A;">${i.name}</strong><br/><span style="font-size: 12px; color: #64748b;">${i.company} | ${i.category}</span></td><td>${i.quantity}</td><td>₹${i.price}</td><td><strong style="color: #1A1A1A;">₹${i.price * i.quantity}</strong></td></tr>`).join('')}
           </table>
           <div class="total">Net Payable: ₹${order.total.toLocaleString('en-IN')}</div>
           <p style="margin-top: 60px; font-size: 12px; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 16px;">
@@ -1012,87 +1523,142 @@ function ProfileScreen({ setCurrentScreen }) {
     }
   };
 
-  const utilization = user.credit_limit > 0 ? (user.credit_balance / user.credit_limit) * 100 : 0;
+  const pendingDues = user.credit_balance || 0;
+  const [showAddressModal, setShowAddressModal] = useState(false);
+  const [addressInput, setAddressInput] = useState(user.address || '');
+  const [savingAddress, setSavingAddress] = useState(false);
+  const accountRows = [
+    { label: 'Business profile', icon: 'business-outline', value: '', action: null },
+    { label: 'Drug license & GSTIN', icon: 'document-text-outline', value: '', action: null },
+    { label: 'Saved addresses', icon: 'location-outline', value: user.address ? '1' : '0', action: () => { setAddressInput(user.address || ''); setShowAddressModal(true); } },
+    { label: 'Payment methods', icon: 'card-outline', value: '', action: null },
+  ];
+
+  const handleSaveAddress = async () => {
+    setSavingAddress(true);
+    try {
+      const url = useStore.getState().getApiUrl();
+      await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'update_address', phone: user.phone, address: addressInput }),
+      });
+      setUser({ ...user, address: addressInput });
+      setShowAddressModal(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (e) {
+      Alert.alert('Error', 'Failed to save address.');
+    }
+    setSavingAddress(false);
+  };
 
   return (
     <View style={styles.screen}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingRight: 16 }}>
-        <Text style={styles.pageTitle}>Business Profile</Text>
-        <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
-          <Text style={styles.logoutBtnText}>Logout</Text>
+      <StatusBar barStyle="dark-content" />
+      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 8, paddingTop: 8 }}>
+        <TouchableOpacity onPress={() => setCurrentScreen('Home')} style={{ marginRight: 12, padding: 4 }}>
+          <Ionicons name="chevron-back" size={24} color="#1A1A1A" />
         </TouchableOpacity>
+        <Text style={{ fontSize: 22, fontWeight: '900', color: '#1A1A1A', letterSpacing: -0.5 }}>Profile</Text>
       </View>
 
-      <FlatList
-        contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
-        ListHeaderComponent={
-          <>
-            <View style={styles.profileHeader}>
-              <View style={[styles.avatar, SHADOWS.glowIndigo]}>
-                <Text style={{ fontSize: 36, color: '#fff', fontWeight: '900' }}>{user.store_name[0]}</Text>
-              </View>
-              <Text style={styles.profileName}>{user.store_name}</Text>
-              <Text style={styles.profilePhone}>+91 {user.phone}</Text>
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+        {/* User Card */}
+        <View style={{ backgroundColor: BRAND[800], borderRadius: 20, padding: 20, marginBottom: 24, ...SHADOWS.md }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+            <View style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: BRAND[700], justifyContent: 'center', alignItems: 'center', marginRight: 14 }}>
+              <Text style={{ color: '#fff', fontWeight: '900', fontSize: 18 }}>{user.store_name?.[0]}{user.store_name?.split(' ')[1]?.[0] || ''}</Text>
             </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: '#fff', fontSize: 18, fontWeight: '900', letterSpacing: -0.3 }}>{user.store_name}</Text>
+              <Text style={{ color: BRAND[100], fontSize: 13, fontWeight: '500', marginTop: 2 }}>+91 {user.phone}</Text>
+            </View>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Text style={{ color: BRAND[100], fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 }}>Verified</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Ionicons name="checkmark-circle" size={14} color={BRAND[500]} />
+              <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>DL · GSTIN</Text>
+            </View>
+            <View style={{ flex: 1 }} />
+            <View>
+              <Text style={{ color: BRAND[100], fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 }}>Since</Text>
+              <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}>Aug 2024</Text>
+            </View>
+          </View>
+        </View>
 
-            <View style={[styles.creditCard, SHADOWS.lg]}>
-              <Text style={styles.creditTitle}>UPKEM CREDIT LINE</Text>
-              <View style={styles.creditStats}>
-                <View>
-                  <Text style={styles.creditLabel}>Utilized</Text>
-                  <Text style={styles.creditValue}>₹{user.credit_balance.toLocaleString('en-IN')}</Text>
-                </View>
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={styles.creditLabel}>Total Limit</Text>
-                  <Text style={styles.creditValue}>₹{user.credit_limit.toLocaleString('en-IN')}</Text>
-                </View>
-              </View>
-              <View style={styles.progressBar}>
-                <View style={[styles.progressFill, { width: `${Math.min(utilization, 100)}%`, backgroundColor: utilization > 90 ? '#ef4444' : '#4f46e5' }]} />
-              </View>
-              <Text style={{color: '#94a3b8', fontSize: 13, marginTop: 16, textAlign: 'right', fontWeight: '600'}}>
-                {(user.credit_limit - user.credit_balance).toLocaleString('en-IN')} Available
-              </Text>
-            </View>
+        {/* Account Section */}
+        <Text style={{ fontSize: 11, fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>Account</Text>
+        <View style={{ backgroundColor: '#fff', borderRadius: 16, marginBottom: 24, borderWidth: 1, borderColor: '#f1f5f9' }}>
+          {accountRows.map((row, idx) => (
+            <TouchableOpacity key={row.label} onPress={row.action} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 16, borderBottomWidth: idx < accountRows.length - 1 ? 1 : 0, borderBottomColor: '#f1f5f9' }}>
+              <Text style={{ flex: 1, fontSize: 15, fontWeight: '600', color: '#1A1A1A' }}>{row.label}</Text>
+              {row.value ? <Text style={{ fontSize: 14, color: '#94a3b8', fontWeight: '600', marginRight: 8 }}>{row.value}</Text> : null}
+              <Ionicons name="chevron-forward" size={16} color="#D1D5DB" />
+            </TouchableOpacity>
+          ))}
+        </View>
 
-            <Text style={styles.sectionTitle}>Order History</Text>
-          </>
-        }
-        data={orders}
-        keyExtractor={item => item.id.toString()}
-        renderItem={({ item }) => (
-          <View style={styles.orderCard}>
-            <View style={styles.orderHeader}>
-              <Text style={styles.orderId}>{item.id}</Text>
-              <View style={[styles.statusBadge, { backgroundColor: item.status === 'Rejected' ? '#fee2e2' : item.status === 'Shipped' ? '#ecfdf5' : '#f1f5f9' }]}>
-                <Text style={[styles.statusText, { color: item.status === 'Rejected' ? '#dc2626' : item.status === 'Shipped' ? '#059669' : '#0f172a' }]}>{item.status}</Text>
-              </View>
-            </View>
-            <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20}}>
-              <Text style={styles.orderDate}>{item.date}</Text>
-              <Text style={styles.orderTotal}>₹{item.total.toLocaleString('en-IN')}</Text>
-            </View>
-            {item.status === 'Shipped' && item.courier_name && (
-              <View style={{ backgroundColor: '#f8fafc', padding: 12, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: '#e2e8f0' }}>
-                <Text style={{ fontSize: 12, fontWeight: '700', color: '#64748b', textTransform: 'uppercase', marginBottom: 4 }}>Delivery Info</Text>
-                <Text style={{ fontSize: 14, fontWeight: '800', color: '#0f172a' }}>{item.courier_name}</Text>
-                <Text style={{ fontSize: 13, fontWeight: '600', color: '#4f46e5', marginTop: 2 }}>{item.tracking_id}</Text>
-              </View>
-            )}
-            {item.status !== 'Rejected' && (
-              <AnimatedPressable style={styles.invoiceBtn} onPress={() => generateInvoice(item)}>
-                <Text style={styles.invoiceBtnText}>📄 Download Tax Invoice</Text>
+        {/* Activity Section */}
+        <Text style={{ fontSize: 11, fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>Activity</Text>
+        <View style={{ backgroundColor: '#fff', borderRadius: 16, marginBottom: 24, borderWidth: 1, borderColor: '#f1f5f9' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
+            <Text style={{ flex: 1, fontSize: 15, fontWeight: '600', color: '#1A1A1A' }}>Orders</Text>
+            <Text style={{ fontSize: 14, color: '#94a3b8', fontWeight: '700' }}>{orders.length}</Text>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
+            <Text style={{ flex: 1, fontSize: 15, fontWeight: '600', color: '#1A1A1A' }}>Invoices</Text>
+            <Text style={{ fontSize: 14, color: '#94a3b8', fontWeight: '700' }}>{orders.length}</Text>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 16 }}>
+            <Text style={{ flex: 1, fontSize: 15, fontWeight: '600', color: '#1A1A1A' }}>Pending dues</Text>
+            <Text style={{ fontSize: 14, color: pendingDues > 0 ? '#EA580C' : '#94a3b8', fontWeight: '700' }}>₹{pendingDues.toLocaleString('en-IN')}</Text>
+          </View>
+        </View>
+
+        {/* Preferences Section */}
+        <Text style={{ fontSize: 11, fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>Preferences</Text>
+        <View style={{ backgroundColor: '#fff', borderRadius: 16, marginBottom: 24, borderWidth: 1, borderColor: '#f1f5f9' }}>
+          <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 16 }}>
+            <Text style={{ flex: 1, fontSize: 15, fontWeight: '600', color: '#1A1A1A' }}>Notifications</Text>
+            <Ionicons name="chevron-forward" size={16} color="#D1D5DB" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Logout */}
+        <TouchableOpacity onPress={handleLogout} style={{ paddingVertical: 16, alignItems: 'center', marginTop: 8 }}>
+          <Text style={{ color: '#dc2626', fontWeight: '800', fontSize: 15 }}>Sign out</Text>
+        </TouchableOpacity>
+      </ScrollView>
+
+      {/* Address Modal */}
+      <Modal visible={showAddressModal} transparent animationType="slide">
+        <View style={styles.modalOverlayBottom}>
+          <View style={styles.bottomSheet}>
+            <View style={styles.dragHandle} />
+            <Text style={styles.modalTitle}>Delivery Address</Text>
+            <Text style={{ color: '#64748b', fontSize: 14, marginBottom: 20 }}>This address will be used for all deliveries.</Text>
+            <TextInput
+              style={[styles.inputFieldConfig, { height: 100, textAlignVertical: 'top', marginBottom: 20 }]}
+              multiline
+              placeholder="Enter your full delivery address..."
+              value={addressInput}
+              onChangeText={setAddressInput}
+            />
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <TouchableOpacity style={styles.btnCancel} onPress={() => setShowAddressModal(false)}>
+                <Text style={{ fontWeight: '800', color: '#64748b', fontSize: 16 }}>Cancel</Text>
+              </TouchableOpacity>
+              <AnimatedPressable style={styles.btnSave} onPress={handleSaveAddress} disabled={savingAddress}>
+                <Text style={{ color: '#fff', fontWeight: '800', fontSize: 16 }}>{savingAddress ? 'Saving...' : 'Save address'}</Text>
               </AnimatedPressable>
-            )}
+            </View>
           </View>
-        )}
-        ListEmptyComponent={
-          <View style={{alignItems: 'center', marginTop: 40}}>
-            <Text style={{fontSize: 32, marginBottom: 12}}>📜</Text>
-            <Text style={{color: '#64748b', fontSize: 16, fontWeight: '500'}}>No previous orders found.</Text>
-          </View>
-        }
-      />
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -1102,6 +1668,7 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState('Login');
   const [isOfflineMode, setIsOfflineMode] = useState(false);
   const [catalogInitialCategory, setCatalogInitialCategory] = useState('All');
+  const [selectedOrder, setSelectedOrder] = useState(null);
   
   const fetchAPI = async () => {
     try {
@@ -1119,11 +1686,16 @@ export default function App() {
       
       const currUser = useStore.getState().user;
       if (currUser) {
-        const userOrders = db.orders.filter(o => o.phone === currUser.phone || o.store === currUser.store_name);
+        const userOrders = db.orders.filter(o => o.phone === currUser.phone || o.store === currUser.store_name || o.user_phone === currUser.phone || o.store_name === currUser.store_name);
         useStore.getState().setOrders(userOrders);
         const liveUser = db.users.find(u => u.phone === currUser.phone);
         if (liveUser && JSON.stringify(liveUser) !== JSON.stringify(currUser)) {
           useStore.getState().setUser(liveUser);
+        }
+        // Also update selectedOrder with live data if tracking
+        if (selectedOrder) {
+          const liveOrder = userOrders.find(o => o.id === selectedOrder.id);
+          if (liveOrder) setSelectedOrder(liveOrder);
         }
       }
     } catch (e) {
@@ -1153,11 +1725,11 @@ export default function App() {
     if (currentScreen === 'Signup') return <SignupScreen setCurrentScreen={setCurrentScreen} />;
     if (currentScreen === 'PendingApproval') return <PendingApprovalScreen setCurrentScreen={setCurrentScreen} />;
     return (
-      <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+      <View style={{ flex: 1, backgroundColor: '#F7FAF8' }}>
         <View style={{ flex: 1, paddingTop: Constants.statusBarHeight || 48 }}>
           {isOfflineMode && (
             <View style={{ backgroundColor: '#fef3c7', padding: 8, alignItems: 'center' }}>
-              <Text style={{ color: '#d97706', fontSize: 12, fontWeight: '800' }}>⚠️ OFFLINE MODE - Showing Cached Catalog</Text>
+              <Text style={{ color: '#d97706', fontSize: 12, fontWeight: '800' }}><Ionicons name="cloud-offline-outline" size={12} color="#d97706" /> OFFLINE MODE - Showing Cached Catalog</Text>
             </View>
           )}
           {currentScreen === 'Home' && (
@@ -1173,26 +1745,30 @@ export default function App() {
             />
           )}
           {currentScreen === 'Cart' && <CartScreen setCurrentScreen={setCurrentScreen} />}
+          {currentScreen === 'Review' && <ReviewConfirmScreen setCurrentScreen={setCurrentScreen} />}
+          {currentScreen === 'Orders' && <OrderHistoryScreen setCurrentScreen={setCurrentScreen} onSelectOrder={(order) => { setSelectedOrder(order); setCurrentScreen('Tracking'); }} />}
+          {currentScreen === 'Tracking' && <OrderTrackingScreen setCurrentScreen={setCurrentScreen} order={selectedOrder} />}
           {currentScreen === 'Profile' && <ProfileScreen setCurrentScreen={setCurrentScreen} />}
         </View>
         <View style={[styles.tabBar, SHADOWS.lg]}>
           <TouchableOpacity style={styles.tabItem} onPress={() => { Haptics.selectionAsync(); setCurrentScreen('Home'); }}>
-            <Text style={{ fontSize: 22, marginBottom: 4, opacity: currentScreen === 'Home' ? 1 : 0.5 }}>🏠</Text>
+            <Ionicons name={currentScreen === 'Home' ? 'home' : 'home-outline'} size={22} color={currentScreen === 'Home' ? BRAND[800] : '#94a3b8'} />
+            {currentScreen === 'Home' && <View style={styles.tabDot} />}
             <Text style={[styles.tabText, currentScreen === 'Home' && styles.tabTextActive]}>Home</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.tabItem} onPress={() => { Haptics.selectionAsync(); setCatalogInitialCategory('All'); setCurrentScreen('Catalog'); }}>
-            <Text style={{ fontSize: 22, marginBottom: 4, opacity: currentScreen === 'Catalog' ? 1 : 0.5 }}>📦</Text>
-            <Text style={[styles.tabText, currentScreen === 'Catalog' && styles.tabTextActive]}>Catalog</Text>
+            <Ionicons name={currentScreen === 'Catalog' ? 'search' : 'search-outline'} size={22} color={currentScreen === 'Catalog' ? BRAND[800] : '#94a3b8'} />
+            {currentScreen === 'Catalog' && <View style={styles.tabDot} />}
+            <Text style={[styles.tabText, currentScreen === 'Catalog' && styles.tabTextActive]}>Browse</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.tabItem} onPress={() => { Haptics.selectionAsync(); setCurrentScreen('Cart'); }}>
-            <View>
-              <Text style={{ fontSize: 22, marginBottom: 4, opacity: currentScreen === 'Cart' ? 1 : 0.5 }}>🛒</Text>
-              {Object.keys(useStore.getState().cart).length > 0 && <View style={styles.cartBadge} />}
-            </View>
-            <Text style={[styles.tabText, currentScreen === 'Cart' && styles.tabTextActive]}>Cart</Text>
+          <TouchableOpacity style={styles.tabItem} onPress={() => { Haptics.selectionAsync(); setCurrentScreen('Orders'); }}>
+            <Ionicons name={currentScreen === 'Orders' ? 'document-text' : 'document-text-outline'} size={22} color={currentScreen === 'Orders' ? BRAND[800] : '#94a3b8'} />
+            {currentScreen === 'Orders' && <View style={styles.tabDot} />}
+            <Text style={[styles.tabText, currentScreen === 'Orders' && styles.tabTextActive]}>Orders</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.tabItem} onPress={() => { Haptics.selectionAsync(); setCurrentScreen('Profile'); }}>
-            <Text style={{ fontSize: 22, marginBottom: 4, opacity: currentScreen === 'Profile' ? 1 : 0.5 }}>👤</Text>
+            <Ionicons name={currentScreen === 'Profile' ? 'person' : 'person-outline'} size={22} color={currentScreen === 'Profile' ? BRAND[800] : '#94a3b8'} />
+            {currentScreen === 'Profile' && <View style={styles.tabDot} />}
             <Text style={[styles.tabText, currentScreen === 'Profile' && styles.tabTextActive]}>Profile</Text>
           </TouchableOpacity>
         </View>
@@ -1205,28 +1781,28 @@ export default function App() {
 
 // --- High-End Styles ---
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#f8fafc' },
-  centeredContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f8fafc', padding: 24 },
-  pageTitle: { fontSize: 32, fontWeight: '900', color: '#0f172a', paddingHorizontal: 16, paddingBottom: 16, paddingTop: 8, letterSpacing: -1 },
+  screen: { flex: 1, backgroundColor: '#F7FAF8' },
+  centeredContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F7FAF8', padding: 24 },
+  pageTitle: { fontSize: 32, fontWeight: '900', color: '#1A1A1A', paddingHorizontal: 16, paddingBottom: 16, paddingTop: 8, letterSpacing: -1 },
   emptyContainer: { alignItems: 'center', marginTop: 40 },
   emptyText: { color: '#64748b', fontSize: 16, fontWeight: '500' },
   
   // Login
-  loginContainer: { flex: 1, backgroundColor: '#020617' }, // Very deep background
+  loginContainer: { flex: 1, backgroundColor: '#0B2618' },
   loginHero: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, paddingTop: 60 },
-  logoContainer: { padding: 4, backgroundColor: '#fff', borderRadius: 28, marginBottom: 24, ...SHADOWS.glowIndigo },
+  logoContainer: { padding: 4, backgroundColor: '#fff', borderRadius: 28, marginBottom: 24, ...SHADOWS.glowGreen },
   loginLogo: { width: 90, height: 90, borderRadius: 24 },
   companyName: { color: '#ffffff', fontSize: 36, fontWeight: '900', letterSpacing: -0.5 },
   tagline: { color: '#64748b', fontSize: 16, marginTop: 8, fontWeight: '600', letterSpacing: 2, textTransform: 'uppercase' },
   loginCard: { backgroundColor: '#ffffff', borderTopLeftRadius: 40, borderTopRightRadius: 40, padding: 32, paddingBottom: 60, ...SHADOWS.lg },
   dragHandle: { width: 40, height: 5, backgroundColor: '#e2e8f0', borderRadius: 3, alignSelf: 'center', marginBottom: 32 },
-  loginTitle: { fontSize: 32, fontWeight: '900', color: '#0f172a', marginBottom: 8, letterSpacing: -1 },
+  loginTitle: { fontSize: 32, fontWeight: '900', color: '#1A1A1A', marginBottom: 8, letterSpacing: -1 },
   loginSubtitle: { fontSize: 16, color: '#64748b', marginBottom: 40, fontWeight: '500' },
   inputWrapper: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: '#e2e8f0', borderRadius: 20, paddingHorizontal: 20, marginBottom: 24, backgroundColor: '#f8fafc' },
-  inputPrefix: { fontSize: 18, fontWeight: '800', color: '#0f172a' },
+  inputPrefix: { fontSize: 18, fontWeight: '800', color: '#1A1A1A' },
   inputDivider: { width: 1.5, height: 24, backgroundColor: '#e2e8f0', marginHorizontal: 16 },
-  inputField: { flex: 1, paddingVertical: 20, fontSize: 18, color: '#0f172a', fontWeight: '700', letterSpacing: 1 },
-  buttonPrimary: { backgroundColor: '#4f46e5', paddingVertical: 20, borderRadius: 20, alignItems: 'center', ...SHADOWS.glowIndigo },
+  inputField: { flex: 1, paddingVertical: 20, fontSize: 18, color: '#1A1A1A', fontWeight: '700', letterSpacing: 1 },
+  buttonPrimary: { backgroundColor: BRAND[800], paddingVertical: 20, borderRadius: 20, alignItems: 'center', ...SHADOWS.glowGreen },
   buttonPrimaryText: { color: '#ffffff', fontSize: 18, fontWeight: '800', letterSpacing: 0.5 },
   configText: { color: '#64748b', textAlign: 'center', fontWeight: '700', fontSize: 13, letterSpacing: 1 },
 
@@ -1236,69 +1812,69 @@ const styles = StyleSheet.create({
   modalContent: { backgroundColor: '#ffffff', borderRadius: 32, padding: 32, ...SHADOWS.lg },
   bottomSheet: { backgroundColor: '#ffffff', borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, paddingBottom: 40, maxHeight: '80%', ...SHADOWS.lg },
   modalTitle: { fontSize: 24, fontWeight: '900', marginBottom: 8, color: '#0f172a', letterSpacing: -0.5 },
-  inputFieldConfig: { borderWidth: 1.5, borderColor: '#e2e8f0', padding: 20, borderRadius: 16, fontSize: 16, backgroundColor: '#f8fafc', color: '#0f172a', fontWeight: '600' },
+  inputFieldConfig: { borderWidth: 1.5, borderColor: '#e2e8f0', padding: 20, borderRadius: 16, fontSize: 16, backgroundColor: '#f8fafc', color: '#1A1A1A', fontWeight: '600' },
   btnCancel: { padding: 18, borderRadius: 16, backgroundColor: '#f1f5f9', flex: 1, alignItems: 'center' },
-  btnSave: { padding: 18, borderRadius: 16, backgroundColor: '#0f172a', flex: 1, alignItems: 'center', ...SHADOWS.md },
+  btnSave: { padding: 18, borderRadius: 16, backgroundColor: BRAND[800], flex: 1, alignItems: 'center', ...SHADOWS.md },
   companyRow: { paddingVertical: 16, paddingHorizontal: 20, borderRadius: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, backgroundColor: '#f8fafc' },
-  companyRowActive: { backgroundColor: '#e0e7ff', borderColor: '#4f46e5', borderWidth: 1 },
+  companyRowActive: { backgroundColor: BRAND[100], borderColor: BRAND[800], borderWidth: 1 },
   companyRowText: { fontSize: 16, fontWeight: '600', color: '#475569' },
-  companyRowTextActive: { color: '#4f46e5', fontWeight: '800' },
+  companyRowTextActive: { color: BRAND[800], fontWeight: '800' },
 
   // Pending
   iconCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#f1f5f9', justifyContent: 'center', alignItems: 'center', marginBottom: 24 },
   iconCircleLg: { width: 100, height: 100, borderRadius: 50, backgroundColor: '#f1f5f9', justifyContent: 'center', alignItems: 'center', marginBottom: 24 },
   pendingCard: { backgroundColor: '#ffffff', padding: 40, borderRadius: 32, alignItems: 'center', ...SHADOWS.md, width: '100%' },
-  pendingTitle: { fontSize: 28, fontWeight: '900', color: '#0f172a', textAlign: 'center', marginBottom: 16, letterSpacing: -1 },
+  pendingTitle: { fontSize: 28, fontWeight: '900', color: '#1A1A1A', textAlign: 'center', marginBottom: 16, letterSpacing: -1 },
   pendingDesc: { fontSize: 16, color: '#64748b', textAlign: 'center', lineHeight: 24, fontWeight: '500' },
 
   // Catalog Header
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 16, paddingTop: 8 },
-  headerTitle: { fontSize: 24, fontWeight: '900', color: '#0f172a', letterSpacing: -0.5 },
+  headerTitle: { fontSize: 24, fontWeight: '900', color: '#1A1A1A', letterSpacing: -0.5 },
   headerCredit: { fontSize: 14, color: '#059669', fontWeight: '700', marginTop: 4 },
   headerLogo: { width: 48, height: 48, borderRadius: 16, ...SHADOWS.sm },
   
   // Search & Categories (MedPlus Style)
   searchContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  searchInput: { flex: 1, backgroundColor: '#ffffff', padding: 18, paddingLeft: 48, borderRadius: 20, fontSize: 16, borderWidth: 1, borderColor: '#f1f5f9', color: '#0f172a', fontWeight: '600', ...SHADOWS.sm },
+  searchInput: { flex: 1, backgroundColor: '#ffffff', padding: 18, paddingLeft: 48, borderRadius: 20, fontSize: 16, borderWidth: 1, borderColor: '#f1f5f9', color: '#1A1A1A', fontWeight: '600', ...SHADOWS.sm },
   filterIconBtn: { width: 60, height: 60, backgroundColor: '#ffffff', borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginLeft: 12, borderWidth: 1, borderColor: '#f1f5f9', ...SHADOWS.sm },
-  filterBadge: { position: 'absolute', top: 14, right: 14, width: 10, height: 10, borderRadius: 5, backgroundColor: '#4f46e5', borderWidth: 2, borderColor: '#ffffff' },
+  filterBadge: { position: 'absolute', top: 14, right: 14, width: 10, height: 10, borderRadius: 5, backgroundColor: BRAND[800], borderWidth: 2, borderColor: '#ffffff' },
   filterTitle: { fontSize: 12, fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, paddingHorizontal: 4 },
   
   categoryPill: { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 24, backgroundColor: '#ffffff', marginRight: 12, borderWidth: 1, borderColor: '#f1f5f9', ...SHADOWS.sm },
-  categoryPillActive: { backgroundColor: '#0f172a', borderColor: '#0f172a' },
+  categoryPillActive: { backgroundColor: BRAND[800], borderColor: BRAND[800] },
   categoryText: { color: '#64748b', fontWeight: '700', fontSize: 14 },
   categoryTextActive: { color: '#ffffff' },
 
   systemPill: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12, backgroundColor: '#f1f5f9', marginRight: 8 },
-  systemPillActive: { backgroundColor: '#e0e7ff' },
+  systemPillActive: { backgroundColor: BRAND[100] },
   systemText: { color: '#64748b', fontWeight: '600', fontSize: 13 },
-  systemTextActive: { color: '#4f46e5', fontWeight: '700' },
+  systemTextActive: { color: BRAND[800], fontWeight: '700' },
   
   // Products
   productCard: { backgroundColor: '#ffffff', padding: 20, borderRadius: 24, marginBottom: 16, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#f1f5f9', ...SHADOWS.sm },
   productInfo: { flex: 1, paddingRight: 16 },
-  productName: { fontSize: 18, fontWeight: '800', color: '#0f172a', marginBottom: 6, letterSpacing: -0.3 },
+  productName: { fontSize: 18, fontWeight: '800', color: '#1A1A1A', marginBottom: 6, letterSpacing: -0.3 },
   productDesc: { fontSize: 13, color: '#64748b', marginBottom: 12, fontWeight: '600' },
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  productPrice: { fontSize: 20, fontWeight: '900', color: '#0f172a' },
+  productPrice: { fontSize: 20, fontWeight: '900', color: '#1A1A1A' },
   stockBadge: { backgroundColor: '#f1f5f9', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
   stockText: { fontSize: 11, fontWeight: '800', color: '#475569' },
   
   cartAction: { alignItems: 'center' },
   addBtn: { backgroundColor: '#f8fafc', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 16, borderWidth: 1, borderColor: '#e2e8f0' },
-  addBtnText: { color: '#4f46e5', fontWeight: '900', fontSize: 14 },
+  addBtnText: { color: BRAND[800], fontWeight: '900', fontSize: 14 },
   qtyControls: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', borderRadius: 16, borderWidth: 1, borderColor: '#e2e8f0' },
   qtyBtn: { padding: 12, paddingHorizontal: 16 },
-  qtyBtnText: { fontSize: 18, fontWeight: '800', color: '#4f46e5' },
-  qtyInput: { width: 40, textAlign: 'center', fontSize: 16, fontWeight: '800', color: '#0f172a' },
+  qtyBtnText: { fontSize: 18, fontWeight: '800', color: BRAND[800] },
+  qtyInput: { width: 40, textAlign: 'center', fontSize: 16, fontWeight: '800', color: '#1A1A1A' },
 
   // Smart Cart Tracker
-  smartCartTracker: { position: 'absolute', bottom: 100, left: 16, right: 16, backgroundColor: '#0f172a', borderRadius: 24, padding: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  smartCartTracker: { position: 'absolute', bottom: 100, left: 16, right: 16, backgroundColor: BRAND[800], borderRadius: 24, padding: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   smartCartTitle: { color: '#ffffff', fontSize: 16, fontWeight: '800', marginBottom: 12 },
-  smartCartProgressBg: { height: 6, backgroundColor: '#334155', borderRadius: 3, overflow: 'hidden' },
+  smartCartProgressBg: { height: 6, backgroundColor: BRAND[700], borderRadius: 3, overflow: 'hidden' },
   smartCartProgressFill: { height: '100%', borderRadius: 3 },
-  smartCartBtn: { width: 56, height: 56, borderRadius: 20, backgroundColor: '#1e293b', justifyContent: 'center', alignItems: 'center' },
-  smartCartBtnText: { color: '#ffffff', fontSize: 20, fontWeight: '900' },
+  smartCartBtn: { width: 56, height: 56, borderRadius: 20, backgroundColor: BRAND[700], justifyContent: 'center', alignItems: 'center' },
+
 
   // Cart Screen
   cartItemCard: { backgroundColor: '#ffffff', padding: 20, borderRadius: 24, marginBottom: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: '#f1f5f9', ...SHADOWS.sm },
@@ -1306,80 +1882,87 @@ const styles = StyleSheet.create({
   checkoutFooter: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#ffffff', padding: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 24, borderTopLeftRadius: 32, borderTopRightRadius: 32, ...SHADOWS.lg },
   billRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   billLabel: { fontSize: 16, color: '#64748b', fontWeight: '600' },
-  billTotal: { fontSize: 28, fontWeight: '900', color: '#0f172a', letterSpacing: -1 },
+  billTotal: { fontSize: 28, fontWeight: '900', color: '#1A1A1A', letterSpacing: -1 },
   minOrderAlert: { backgroundColor: '#fef2f2', padding: 12, borderRadius: 12, marginBottom: 16, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#fee2e2' },
   minOrderAlertText: { color: '#dc2626', fontSize: 13, fontWeight: '700' },
-  checkoutBtn: { backgroundColor: '#0f172a', paddingVertical: 20, borderRadius: 20, alignItems: 'center' },
+  checkoutBtn: { backgroundColor: BRAND[800], paddingVertical: 20, borderRadius: 20, alignItems: 'center' },
   checkoutBtnDisabled: { backgroundColor: '#cbd5e1', opacity: 0.7 },
   checkoutBtnText: { color: '#ffffff', fontSize: 18, fontWeight: '800' },
 
   // Profile
   profileHeader: { alignItems: 'center', marginBottom: 32 },
-  avatar: { width: 90, height: 90, borderRadius: 45, backgroundColor: '#4f46e5', justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
-  profileName: { fontSize: 24, fontWeight: '900', color: '#0f172a', marginBottom: 4, letterSpacing: -0.5 },
+  avatar: { width: 90, height: 90, borderRadius: 45, backgroundColor: BRAND[800], justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
+  profileName: { fontSize: 24, fontWeight: '900', color: '#1A1A1A', marginBottom: 4, letterSpacing: -0.5 },
   profilePhone: { fontSize: 16, color: '#64748b', fontWeight: '600' },
   logoutBtn: { backgroundColor: '#fee2e2', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12 },
   logoutBtnText: { color: '#dc2626', fontWeight: '800', fontSize: 13 },
   
-  creditCard: { backgroundColor: '#0f172a', padding: 24, borderRadius: 32, marginBottom: 40 },
+  creditCard: { backgroundColor: BRAND[800], padding: 24, borderRadius: 32, marginBottom: 40 },
   creditTitle: { color: '#94a3b8', fontSize: 12, fontWeight: '800', letterSpacing: 2, marginBottom: 20 },
   creditStats: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24 },
   creditLabel: { color: '#94a3b8', fontSize: 14, fontWeight: '500', marginBottom: 4 },
   creditValue: { color: '#ffffff', fontSize: 24, fontWeight: '900', letterSpacing: -0.5 },
-  progressBar: { height: 8, backgroundColor: '#1e293b', borderRadius: 4, overflow: 'hidden' },
+  progressBar: { height: 8, backgroundColor: BRAND[700], borderRadius: 4, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 4 },
   
-  sectionTitle: { fontSize: 22, fontWeight: '900', color: '#0f172a', marginBottom: 20, letterSpacing: -0.5 },
+  sectionTitle: { fontSize: 22, fontWeight: '900', color: '#1A1A1A', marginBottom: 20, letterSpacing: -0.5 },
   orderCard: { backgroundColor: '#ffffff', padding: 24, borderRadius: 24, marginBottom: 16, borderWidth: 1, borderColor: '#f1f5f9', ...SHADOWS.sm },
   orderHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16, alignItems: 'center' },
-  orderId: { fontWeight: '900', color: '#0f172a', fontSize: 16 },
+  orderId: { fontWeight: '900', color: '#1A1A1A', fontSize: 16 },
   statusBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 },
   statusText: { fontWeight: '800', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
   orderDate: { color: '#64748b', fontSize: 14, fontWeight: '600' },
-  orderTotal: { color: '#0f172a', fontSize: 18, fontWeight: '900' },
-  invoiceBtn: { backgroundColor: '#f8fafc', padding: 16, borderRadius: 16, alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0' },
-  invoiceBtnText: { color: '#4f46e5', fontWeight: '800', fontSize: 14 },
+  orderTotal: { color: '#1A1A1A', fontSize: 18, fontWeight: '900' },
+  invoiceBtn: { backgroundColor: BRAND[50], padding: 16, borderRadius: 16, alignItems: 'center', borderWidth: 1, borderColor: BRAND[100] },
+  invoiceBtnText: { color: BRAND[800], fontWeight: '800', fontSize: 14 },
 
   // Tabs
   tabBar: { flexDirection: 'row', backgroundColor: '#ffffff', paddingBottom: Platform.OS === 'ios' ? 32 : 20, paddingTop: 16, position: 'absolute', bottom: 0, left: 0, right: 0 },
   tabItem: { flex: 1, alignItems: 'center', position: 'relative' },
   tabText: { color: '#94a3b8', fontWeight: '700', fontSize: 12, marginTop: 4 },
-  tabTextActive: { color: '#0f172a', fontWeight: '900' },
+  tabTextActive: { color: BRAND[800], fontWeight: '900' },
+  tabDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: BRAND[500], marginTop: 3 },
   cartBadge: { position: 'absolute', top: -4, right: -8, width: 12, height: 12, backgroundColor: '#ef4444', borderRadius: 6, borderWidth: 2, borderColor: '#fff' },
 
   // Home Screen
   homeHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 12, paddingTop: 8 },
   homeGreeting: { fontSize: 14, color: '#64748b', fontWeight: '600' },
-  homeStoreName: { fontSize: 22, fontWeight: '900', color: '#0f172a', letterSpacing: -0.5 },
+  homeStoreName: { fontSize: 22, fontWeight: '900', color: '#1A1A1A', letterSpacing: -0.5 },
   homeSearchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', marginHorizontal: 16, marginBottom: 16, padding: 18, borderRadius: 20, borderWidth: 1, borderColor: '#e2e8f0', ...SHADOWS.sm },
   homeSearchPlaceholder: { color: '#94a3b8', fontSize: 16, fontWeight: '600' },
-  promoBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0f172a', marginHorizontal: 16, marginBottom: 24, padding: 24, borderRadius: 24, ...SHADOWS.md },
+  statsRow: { flexDirection: 'row', marginHorizontal: 16, marginBottom: 16, gap: 10 },
+  statCard: { flex: 1, backgroundColor: '#ffffff', padding: 14, borderRadius: 16, borderWidth: 1, borderColor: '#E5E7EB', ...SHADOWS.sm },
+  statLabel: { fontSize: 10, fontWeight: '800', color: '#6B7280', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 4 },
+  statValue: { fontSize: 18, fontWeight: '900', color: '#1A1A1A', letterSpacing: -0.5 },
+  statSub: { fontSize: 11, color: '#94a3b8', fontWeight: '600', marginTop: 2 },
+  homeCategoryCircle: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
+  promoBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: BRAND[800], marginHorizontal: 16, marginBottom: 24, padding: 24, borderRadius: 24, ...SHADOWS.md },
   promoBannerTitle: { color: '#ffffff', fontSize: 18, fontWeight: '900', marginBottom: 6, letterSpacing: -0.3 },
   promoBannerSub: { color: '#94a3b8', fontSize: 13, fontWeight: '500', lineHeight: 18, marginBottom: 16 },
-  promoBannerBtn: { backgroundColor: '#4f46e5', paddingVertical: 10, paddingHorizontal: 20, borderRadius: 14, alignSelf: 'flex-start' },
+  promoBannerBtn: { backgroundColor: BRAND[800], paddingVertical: 10, paddingHorizontal: 20, borderRadius: 14, alignSelf: 'flex-start' },
   promoBannerBtnText: { color: '#ffffff', fontWeight: '800', fontSize: 14 },
   homeSectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, marginBottom: 12 },
-  homeSectionTitle: { fontSize: 20, fontWeight: '900', color: '#0f172a', letterSpacing: -0.3 },
-  seeAllText: { color: '#4f46e5', fontWeight: '700', fontSize: 14 },
+  homeSectionTitle: { fontSize: 20, fontWeight: '900', color: '#1A1A1A', letterSpacing: -0.3 },
+  seeAllText: { color: BRAND[700], fontWeight: '700', fontSize: 14 },
   homeCategoryGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12, marginBottom: 8 },
   homeCategoryItem: { width: '18%', margin: '1%', aspectRatio: 0.85, borderRadius: 16, alignItems: 'center', justifyContent: 'center', padding: 8 },
   homeCategoryIcon: { fontSize: 28, marginBottom: 6 },
-  homeCategoryText: { fontSize: 11, fontWeight: '700', color: '#0f172a', textAlign: 'center' },
+  homeCategoryText: { fontSize: 11, fontWeight: '700', color: '#1A1A1A', textAlign: 'center' },
   featuredCard: { backgroundColor: '#ffffff', width: 148, marginRight: 12, borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: '#f1f5f9', ...SHADOWS.sm },
   featuredCardImage: { width: '100%', height: 110, backgroundColor: '#f1f5f9' },
-  featuredCardName: { fontSize: 13, fontWeight: '800', color: '#0f172a', margin: 10, marginBottom: 2, lineHeight: 18 },
+  featuredCardName: { fontSize: 13, fontWeight: '800', color: '#1A1A1A', margin: 10, marginBottom: 2, lineHeight: 18 },
   featuredCardCompany: { fontSize: 11, color: '#64748b', fontWeight: '600', marginHorizontal: 10, marginBottom: 4 },
-  featuredCardPrice: { fontSize: 15, fontWeight: '900', color: '#4f46e5', margin: 10, marginTop: 2, marginBottom: 12 },
+  featuredCardPrice: { fontSize: 15, fontWeight: '900', color: BRAND[800], margin: 10, marginTop: 2, marginBottom: 12 },
 
   // Catalog search + filter
   searchRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 0, gap: 10 },
   filterBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#ffffff', paddingHorizontal: 16, paddingVertical: 18, borderRadius: 20, borderWidth: 1, borderColor: '#e2e8f0', ...SHADOWS.sm },
-  filterBtnActive: { backgroundColor: '#4f46e5', borderColor: '#4f46e5' },
+  filterBtnActive: { backgroundColor: BRAND[800], borderColor: BRAND[800] },
   filterBtnText: { fontWeight: '800', fontSize: 14, color: '#475569' },
   filterCountBadge: { backgroundColor: '#ef4444', width: 18, height: 18, borderRadius: 9, justifyContent: 'center', alignItems: 'center', position: 'absolute', top: -6, right: -6 },
   filterCountText: { color: '#fff', fontSize: 10, fontWeight: '900' },
-  activeChip: { backgroundColor: '#e0e7ff', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginRight: 8, borderWidth: 1, borderColor: '#c7d2fe' },
-  activeChipText: { color: '#4f46e5', fontWeight: '700', fontSize: 12 },
+  activeChip: { backgroundColor: BRAND[100], paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginRight: 8, borderWidth: 1, borderColor: BRAND[500] },
+  activeChipText: { color: BRAND[800], fontWeight: '700', fontSize: 12 },
   clearChip: { backgroundColor: '#fee2e2', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginRight: 8 },
   clearChipText: { color: '#dc2626', fontWeight: '700', fontSize: 12 },
 
@@ -1398,13 +1981,13 @@ const styles = StyleSheet.create({
   filterSectionTitle: { fontSize: 13, fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 20, marginBottom: 12 },
   filterRadioRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, gap: 12 },
   radioOuter: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#cbd5e1', justifyContent: 'center', alignItems: 'center' },
-  radioOuterActive: { borderColor: '#4f46e5' },
-  radioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#4f46e5' },
+  radioOuterActive: { borderColor: BRAND[800] },
+  radioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: BRAND[800] },
   filterOptionText: { fontSize: 16, color: '#475569', fontWeight: '600' },
-  filterOptionTextActive: { color: '#0f172a', fontWeight: '800' },
+  filterOptionTextActive: { color: '#1A1A1A', fontWeight: '800' },
   filterChipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   filterChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: '#f1f5f9', borderWidth: 1, borderColor: '#e2e8f0' },
-  filterChipActive: { backgroundColor: '#e0e7ff', borderColor: '#4f46e5' },
+  filterChipActive: { backgroundColor: BRAND[100], borderColor: BRAND[800] },
   filterChipText: { fontSize: 13, fontWeight: '600', color: '#475569' },
-  filterChipTextActive: { color: '#4f46e5', fontWeight: '800' },
+  filterChipTextActive: { color: BRAND[800], fontWeight: '800' },
 });

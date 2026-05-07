@@ -77,7 +77,7 @@ function getDefaultImage(category: string): string {
 }
 
 function getDefaultDescription(category: string): string {
-  return \`High-quality pharmaceutical formulation for \${category.toLowerCase()} treatments. Clinically tested for efficacy and safety.\`;
+  return `High-quality pharmaceutical formulation for ${category.toLowerCase()} treatments. Clinically tested for efficacy and safety.`;
 }
 
 export async function POST(request: Request) {

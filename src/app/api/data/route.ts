@@ -28,7 +28,7 @@ async function sendPushNotification(expoPushToken: string, title: string, body: 
 
 export async function GET() {
   try {
-    const users = db.prepare('SELECT id, phone, store_name, is_approved, role, credit_balance, credit_limit, created_at FROM users').all() as any[];
+    const users = db.prepare('SELECT id, phone, store_name, is_approved, role, credit_balance, credit_limit, address, created_at FROM users').all() as any[];
     const products = db.prepare('SELECT * FROM products').all() as any[];
     const orders = db.prepare('SELECT * FROM orders ORDER BY created_at DESC').all() as any[];
     
@@ -198,6 +198,12 @@ export async function POST(request: Request) {
     else if (action === 'update_stock') {
       const { productId, changeAmount } = body;
       db.prepare('UPDATE products SET stock = MAX(0, stock + ?) WHERE id = ?').run(changeAmount, productId);
+      return NextResponse.json({ success: true });
+    }
+
+    else if (action === 'update_address') {
+      const { phone, address } = body;
+      db.prepare('UPDATE users SET address = ? WHERE phone = ?').run(address, phone);
       return NextResponse.json({ success: true });
     }
 
