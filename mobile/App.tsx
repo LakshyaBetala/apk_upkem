@@ -31,7 +31,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 }
 
 const DEFAULT_IP = '192.168.1.100';
-const MIN_ORDER_VALUE = 2000;
+const MIN_ORDER_VALUE = 5000;
 
 // Premium Shadow System
 // UPKEM Brand Colors
