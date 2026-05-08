@@ -156,11 +156,12 @@ export default function Dashboard() {
           min_order_value: schemeForm.min_order_value ? Number(schemeForm.min_order_value) : 0,
           max_discount: schemeForm.max_discount ? Number(schemeForm.max_discount) : null,
           usage_limit: schemeForm.usage_limit ? Number(schemeForm.usage_limit) : 0,
+          per_user_limit: schemeForm.per_user_limit ? Number(schemeForm.per_user_limit) : 1,
         })
       });
       const data = await res.json();
       if (data.success) {
-        setSchemeForm({ title: '', description: '', code: '', scheme_type: 'Discount', discount_percent: '', flat_discount: '', min_order_value: '', max_discount: '', start_date: '', end_date: '', usage_limit: '' });
+        setSchemeForm({ title: '', description: '', code: '', scheme_type: 'Discount', discount_percent: '', flat_discount: '', min_order_value: '', max_discount: '', start_date: '', end_date: '', usage_limit: '', per_user_limit: '1' });
         setShowSchemeForm(false);
         fetchLiveDB();
       } else {
