@@ -28,9 +28,10 @@ async function sendPushNotification(expoPushToken: string, title: string, body: 
 
 export async function GET() {
   try {
-    const users = db.prepare('SELECT id, phone, store_name, is_approved, role, credit_balance, credit_limit, address, created_at FROM users').all() as any[];
+    const users = db.prepare('SELECT id, phone, store_name, is_approved, role, credit_balance, credit_limit, address, zone, city, created_at FROM users').all() as any[];
     const products = db.prepare('SELECT * FROM products').all() as any[];
     const orders = db.prepare('SELECT * FROM orders ORDER BY created_at DESC').all() as any[];
+    const schemes = db.prepare('SELECT * FROM schemes ORDER BY created_at DESC').all() as any[];
     
     // Join order items
     const populatedOrders = orders.map((order: any) => {
@@ -60,7 +61,8 @@ export async function GET() {
     return NextResponse.json({
       users,
       products,
-      orders: populatedOrders
+      orders: populatedOrders,
+      schemes
     });
   } catch (err) {
     console.error('DB Read Error:', err);
@@ -75,8 +77,8 @@ export async function POST(request: Request) {
 
     if (collection === 'orders' && action === 'create') {
       const insertOrder = db.prepare(`
-        INSERT INTO orders (id, user_phone, store_name, status, total, date)
-        VALUES (@id, @phone, @store, @status, @total, @date)
+        INSERT INTO orders (id, user_phone, store_name, status, total, date, scheme_code)
+        VALUES (@id, @phone, @store, @status, @total, @date, @scheme_code)
       `);
       
       const insertOrderItem = db.prepare(`
@@ -88,14 +90,29 @@ export async function POST(request: Request) {
         UPDATE users SET credit_balance = credit_balance + @total WHERE phone = @phone OR store_name = @store
       `);
 
+      const incrementSchemeUsage = db.prepare(`
+        UPDATE schemes SET times_used = times_used + 1 WHERE code = @code
+      `);
+
       const createOrderTransaction = db.transaction((orderData) => {
+        if (orderData.scheme_code) {
+          const scheme = db.prepare('SELECT per_user_limit FROM schemes WHERE code = ?').get(orderData.scheme_code) as any;
+          if (scheme && scheme.per_user_limit > 0) {
+            const usage = db.prepare('SELECT COUNT(*) as count FROM orders WHERE user_phone = ? AND scheme_code = ?').get(orderData.phone, orderData.scheme_code) as any;
+            if (usage.count >= scheme.per_user_limit) {
+              throw new Error(`Coupon usage limit reached for this user (${scheme.per_user_limit} max).`);
+            }
+          }
+        }
+
         insertOrder.run({
           id: orderData.id,
           phone: orderData.phone,
           store: orderData.store,
           status: 'Placed',
           total: orderData.total,
-          date: orderData.date
+          date: orderData.date,
+          scheme_code: orderData.scheme_code || null
         });
 
         for (const i of orderData.items) {
@@ -108,10 +125,18 @@ export async function POST(request: Request) {
         }
 
         updateUserCredit.run({ total: orderData.total, phone: orderData.phone, store: orderData.store });
+
+        if (orderData.scheme_code) {
+          incrementSchemeUsage.run({ code: orderData.scheme_code });
+        }
       });
 
-      createOrderTransaction(item);
-      return NextResponse.json({ success: true });
+      try {
+        createOrderTransaction(item);
+        return NextResponse.json({ success: true });
+      } catch (e: any) {
+        return NextResponse.json({ error: e.message || 'Failed to create order.' }, { status: 400 });
+      }
     } 
     else if (collection === 'orders' && action === 'update_status') {
       const getOrder = db.prepare('SELECT * FROM orders WHERE id = ?').get(item.id) as any;

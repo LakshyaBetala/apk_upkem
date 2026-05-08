@@ -79,6 +79,7 @@ export function initDB() {
       date TEXT NOT NULL,
       courier_name TEXT,
       tracking_id TEXT,
+      scheme_code TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY(user_phone) REFERENCES users(phone)
     );
@@ -92,6 +93,25 @@ export function initDB() {
       FOREIGN KEY(order_id) REFERENCES orders(id),
       FOREIGN KEY(product_id) REFERENCES products(id)
     );
+
+    CREATE TABLE IF NOT EXISTS schemes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      description TEXT,
+      code TEXT UNIQUE NOT NULL,
+      scheme_type TEXT NOT NULL DEFAULT 'Discount',
+      discount_percent REAL,
+      flat_discount REAL,
+      min_order_value REAL DEFAULT 0,
+      max_discount REAL,
+      start_date TEXT NOT NULL,
+      end_date TEXT NOT NULL,
+      is_active BOOLEAN DEFAULT 1,
+      usage_limit INTEGER DEFAULT 0,
+      per_user_limit INTEGER DEFAULT 1,
+      times_used INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
   `);
 
   // Migration: Add image_url column if it doesn't exist (for existing databases)
@@ -100,6 +120,37 @@ export function initDB() {
   } catch {
     db.exec("ALTER TABLE products ADD COLUMN image_url TEXT");
   }
+
+  // Migration: Add zone and city columns to users
+  try {
+    db.prepare("SELECT zone FROM users LIMIT 1").get();
+  } catch {
+    db.exec("ALTER TABLE users ADD COLUMN zone TEXT");
+  }
+  try {
+    db.prepare("SELECT city FROM users LIMIT 1").get();
+  } catch {
+    db.exec("ALTER TABLE users ADD COLUMN city TEXT");
+  }
+
+  // Migration: Add scheme_code to orders
+  try {
+    db.prepare("SELECT scheme_code FROM orders LIMIT 1").get();
+  } catch {
+    db.exec("ALTER TABLE orders ADD COLUMN scheme_code TEXT");
+  }
+
+  // Migration: Add per_user_limit to schemes
+  try {
+    db.prepare("SELECT per_user_limit FROM schemes LIMIT 1").get();
+  } catch {
+    try {
+      db.exec("ALTER TABLE schemes ADD COLUMN per_user_limit INTEGER DEFAULT 1");
+    } catch(e) {}
+  }
 }
+
+// Ensure db is initialized
+initDB();
 
 export default db;

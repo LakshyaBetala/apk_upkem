@@ -7,7 +7,8 @@ export async function POST(request: Request) {
     const data = await request.json();
     const { 
       phone, store_name, user_type, drug_license, 
-      gst_number, registration_number, address, email 
+      gst_number, registration_number, address, email,
+      zone, city
     } = data;
 
     if (!phone || !store_name || !user_type) {
@@ -24,9 +25,10 @@ export async function POST(request: Request) {
     const insertUser = db.prepare(`
       INSERT INTO users (
         phone, store_name, is_approved, role, password_hash, 
-        user_type, drug_license, gst_number, registration_number, address, email
+        user_type, drug_license, gst_number, registration_number, address, email,
+        zone, city
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     insertUser.run(
@@ -40,7 +42,9 @@ export async function POST(request: Request) {
       gst_number || null,
       registration_number || null,
       address || null,
-      email || null
+      email || null,
+      zone || null,
+      city || null
     );
 
     return NextResponse.json({ success: true, message: 'Registration successful. Pending approval.' });

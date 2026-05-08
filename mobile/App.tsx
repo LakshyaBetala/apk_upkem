@@ -146,8 +146,16 @@ const useStore = create((set, get) => ({
   getOtpUrl: () => `http://${get().serverIp}:3000/api/auth/otp`,
   getVerifyUrl: () => `http://${get().serverIp}:3000/api/auth/verify`,
   getSignupUrl: () => `http://${get().serverIp}:3000/api/auth/signup`,
+  getSchemesUrl: () => `http://${get().serverIp}:3000/api/schemes`,
 
   getTokenUrl: () => `http://${get().serverIp}:3000/api/user/token`,
+
+  // Schemes / Coupons
+  schemes: [],
+  setSchemes: (schemes) => set({ schemes }),
+  appliedCoupon: null,
+  setAppliedCoupon: (coupon) => set({ appliedCoupon: coupon }),
+  clearCoupon: () => set({ appliedCoupon: null }),
   placeOrder: async (order) => {
     try {
       const res = await fetch(get().getApiUrl(), {
@@ -168,6 +176,7 @@ const useStore = create((set, get) => ({
     set((state) => ({
       orders: [order, ...state.orders],
       cart: {},
+      appliedCoupon: null,
       user: state.user ? { ...state.user, credit_balance: state.user.credit_balance + order.total } : null
     }));
     return true;
@@ -205,10 +214,15 @@ async function registerForPushNotificationsAsync() {
 }
 
 
+const TN_DISTRICTS = [
+  'Ariyalur', 'Chengalpattu', 'Chennai', 'Coimbatore', 'Cuddalore', 'Dharmapuri', 'Dindigul', 'Erode', 'Kallakurichi', 'Kancheepuram', 'Kanyakumari', 'Karur', 'Krishnagiri', 'Madurai', 'Mayiladuthurai', 'Nagapattinam', 'Namakkal', 'Nilgiris', 'Perambalur', 'Pudukkottai', 'Ramanathapuram', 'Ranipet', 'Salem', 'Sivaganga', 'Tenkasi', 'Thanjavur', 'Theni', 'Thoothukudi', 'Tiruchirappalli', 'Tirunelveli', 'Tirupattur', 'Tirupur', 'Tiruvallur', 'Tiruvannamalai', 'Vellore', 'Villupuram', 'Virudhunagar'
+];
+
 // --- Signup Screen ---
 function SignupScreen({ setCurrentScreen }) {
-  const [form, setForm] = useState({ phone: '', store_name: '', user_type: 'Retailer', drug_license: '', gst_number: '', registration_number: '', address: '', email: '' });
+  const [form, setForm] = useState({ phone: '', store_name: '', user_type: 'Retailer', drug_license: '', gst_number: '', registration_number: '', address: '', email: '', zone: 'Tamil Nadu', city: '' });
   const [isLoading, setIsLoading] = useState(false);
+  const [showCityPicker, setShowCityPicker] = useState(false);
   const getSignupUrl = useStore((state) => state.getSignupUrl);
 
   const handleSignup = async () => {
@@ -240,23 +254,34 @@ function SignupScreen({ setCurrentScreen }) {
         <Text style={[styles.loginTitle, {color: '#fff'}]}>Register Firm</Text>
         <Text style={[styles.loginSubtitle, {color: '#94a3b8'}]}>Join the B2B Command Network.</Text>
         
-        <TextInput style={styles.inputFieldConfig} placeholder="Firm / Clinic Name" value={form.store_name} onChangeText={(t) => setForm({...form, store_name: t})} />
-        <TextInput style={[styles.inputFieldConfig, {marginTop: 12}]} placeholder="Phone Number" keyboardType="phone-pad" value={form.phone} onChangeText={(t) => setForm({...form, phone: t})} />
-        <TextInput style={[styles.inputFieldConfig, {marginTop: 12}]} placeholder="Email Address" keyboardType="email-address" value={form.email} onChangeText={(t) => setForm({...form, email: t})} />
+        <TextInput style={styles.inputFieldConfig} placeholder="Firm / Clinic Name" placeholderTextColor="#64748b" value={form.store_name} onChangeText={(t) => setForm({...form, store_name: t})} />
+        <TextInput style={[styles.inputFieldConfig, {marginTop: 12}]} placeholder="Phone Number" placeholderTextColor="#64748b" keyboardType="phone-pad" value={form.phone} onChangeText={(t) => setForm({...form, phone: t})} />
+        <TextInput style={[styles.inputFieldConfig, {marginTop: 12}]} placeholder="Email Address" placeholderTextColor="#64748b" keyboardType="email-address" value={form.email} onChangeText={(t) => setForm({...form, email: t})} />
         
         <Text style={{color: '#fff', marginTop: 20, marginBottom: 8, fontWeight: '700'}}>User Type</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom: 16}}>
           {['Retailer', 'Clinic', 'Doctor', 'Doctor with Pharmacy'].map(type => (
-            <TouchableOpacity key={type} onPress={() => setForm({...form, user_type: type})} style={{padding: 12, backgroundColor: form.user_type === type ? BRAND[800] : '#1e293b', borderRadius: 12, marginRight: 8}}>
+            <TouchableOpacity key={type} onPress={() => setForm({...form, user_type: type})} style={{padding: 12, backgroundColor: form.user_type === type ? BRAND[800] : '#1e293b', borderRadius: 12, marginRight: 8, borderWidth: form.user_type === type ? 1.5 : 0, borderColor: BRAND[500]}}>
               <Text style={{color: '#fff', fontWeight: '600'}}>{type}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
 
-        {form.user_type !== 'Doctor' && <TextInput style={[styles.inputFieldConfig, {marginTop: 12}]} placeholder="Drug License Number" value={form.drug_license} onChangeText={(t) => setForm({...form, drug_license: t})} />}
-        {(form.user_type === 'Retailer' || form.user_type === 'Doctor with Pharmacy') && <TextInput style={[styles.inputFieldConfig, {marginTop: 12}]} placeholder="GST Number" value={form.gst_number} onChangeText={(t) => setForm({...form, gst_number: t})} />}
-        {form.user_type !== 'Retailer' && <TextInput style={[styles.inputFieldConfig, {marginTop: 12}]} placeholder="Registration Number" value={form.registration_number} onChangeText={(t) => setForm({...form, registration_number: t})} />}
-        <TextInput style={[styles.inputFieldConfig, {marginTop: 12}]} placeholder="Full Address" value={form.address} onChangeText={(t) => setForm({...form, address: t})} />
+        {/* District Dropdown */}
+        <Text style={{color: '#fff', marginTop: 8, marginBottom: 8, fontWeight: '700'}}>State & District</Text>
+        <View style={[styles.inputFieldConfig, {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', opacity: 0.7}]}>
+          <Text style={{color: '#fff', fontSize: 15, fontWeight: '700'}}>{form.zone}</Text>
+          <Ionicons name="lock-closed" size={16} color="#64748b" />
+        </View>
+        <TouchableOpacity style={[styles.inputFieldConfig, {marginTop: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'}]} onPress={() => setShowCityPicker(true)}>
+          <Text style={{color: form.city ? '#fff' : '#64748b', fontSize: 15, fontWeight: form.city ? '700' : '400'}}>{form.city || 'Select District'}</Text>
+          <Ionicons name="chevron-down" size={18} color="#64748b" />
+        </TouchableOpacity>
+
+        {form.user_type !== 'Doctor' && <TextInput style={[styles.inputFieldConfig, {marginTop: 12}]} placeholder="Drug License Number" placeholderTextColor="#64748b" value={form.drug_license} onChangeText={(t) => setForm({...form, drug_license: t})} />}
+        {(form.user_type === 'Retailer' || form.user_type === 'Doctor with Pharmacy') && <TextInput style={[styles.inputFieldConfig, {marginTop: 12}]} placeholder="GST Number" placeholderTextColor="#64748b" value={form.gst_number} onChangeText={(t) => setForm({...form, gst_number: t})} />}
+        {form.user_type !== 'Retailer' && <TextInput style={[styles.inputFieldConfig, {marginTop: 12}]} placeholder="Registration Number" placeholderTextColor="#64748b" value={form.registration_number} onChangeText={(t) => setForm({...form, registration_number: t})} />}
+        <TextInput style={[styles.inputFieldConfig, {marginTop: 12}]} placeholder="Full Address" placeholderTextColor="#64748b" value={form.address} onChangeText={(t) => setForm({...form, address: t})} />
 
         <AnimatedPressable style={[styles.buttonPrimary, {marginTop: 24}]} onPress={handleSignup} disabled={isLoading}>
           <Text style={styles.buttonPrimaryText}>{isLoading ? 'Submitting...' : 'Submit Application'}</Text>
@@ -265,10 +290,33 @@ function SignupScreen({ setCurrentScreen }) {
         <TouchableOpacity style={{ marginTop: 20 }} onPress={() => setCurrentScreen('Login')}>
           <Text style={styles.configText}>ALREADY REGISTERED? LOGIN</Text>
         </TouchableOpacity>
+
+        {/* City/District Picker Modal */}
+        <Modal visible={showCityPicker} transparent animationType="slide">
+          <View style={styles.modalOverlayBottom}>
+            <View style={[styles.bottomSheet, { maxHeight: '70%' }]}>
+              <View style={styles.dragHandle} />
+              <Text style={styles.modalTitle}>Select District</Text>
+              <Text style={{color: '#64748b', fontSize: 13, marginBottom: 16, fontWeight: '500'}}>{form.zone}</Text>
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {TN_DISTRICTS.map(city => (
+                  <TouchableOpacity key={city} style={{ paddingVertical: 14, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: '#f1f5f9', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: form.city === city ? BRAND[50] : '#fff' }} onPress={() => { Haptics.selectionAsync(); setForm({...form, city}); setShowCityPicker(false); }}>
+                    <Text style={{fontSize: 15, fontWeight: form.city === city ? '800' : '500', color: form.city === city ? BRAND[800] : '#1A1A1A'}}>{city}</Text>
+                    {form.city === city && <Ionicons name="checkmark-circle" size={20} color={BRAND[800]} />}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              <AnimatedPressable style={[styles.buttonPrimary, {marginTop: 16}]} onPress={() => setShowCityPicker(false)}>
+                <Text style={styles.buttonPrimaryText}>Close</Text>
+              </AnimatedPressable>
+            </View>
+          </View>
+        </Modal>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
+
 
 // --- Login Screen ---
 function LoginScreen({ setCurrentScreen }) {
@@ -445,6 +493,7 @@ function HomeScreen({ setCurrentScreen, onCategorySelect }) {
   const products = useStore((s) => s.products);
   const user = useStore((s) => s.user);
   const orders = useStore((s) => s.orders);
+  const schemes = useStore((s) => s.schemes)?.filter(s => s.is_active);
   const featured = products.slice(0, 8);
   const lastOrder = orders.length > 0 ? orders[0] : null;
   const availableCredit = user ? (user.credit_limit - user.credit_balance) : 0;
@@ -493,6 +542,33 @@ function HomeScreen({ setCurrentScreen, onCategorySelect }) {
             <Text style={styles.statSub}>Available</Text>
           </View>
         </View>
+
+        {/* Active Schemes / Special Offers */}
+        {schemes && schemes.length > 0 && (
+          <View style={{ marginBottom: 16 }}>
+            <View style={styles.homeSectionRow}>
+              <Text style={styles.homeSectionTitle}>Active Offers</Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}>
+              {schemes.map((scheme, idx) => (
+                <View key={scheme.id || idx} style={{ width: 280, backgroundColor: BRAND[800], padding: 20, borderRadius: 20, ...SHADOWS.md }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                    <View style={{ backgroundColor: BRAND[600], paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 }}>
+                      <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800', textTransform: 'uppercase' }}>{scheme.scheme_type}</Text>
+                    </View>
+                    <Ionicons name="pricetag" size={20} color={BRAND[100]} />
+                  </View>
+                  <Text style={{ color: '#fff', fontSize: 18, fontWeight: '900', letterSpacing: -0.3, marginBottom: 4 }}>{scheme.title}</Text>
+                  <Text style={{ color: BRAND[100], fontSize: 13, fontWeight: '500', marginBottom: 16 }}>{scheme.description || 'Apply code at checkout'}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, alignSelf: 'flex-start' }}>
+                    <Text style={{ color: '#64748b', fontSize: 11, fontWeight: '700', marginRight: 6 }}>CODE:</Text>
+                    <Text style={{ color: BRAND[800], fontSize: 14, fontWeight: '900', letterSpacing: 1 }}>{scheme.code}</Text>
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        )}
 
         {/* Browse by Category */}
         <View style={styles.homeSectionRow}>
@@ -1067,8 +1143,15 @@ function ReviewConfirmScreen({ setCurrentScreen }) {
   const products = useStore((state) => state.products);
   const placeOrder = useStore((state) => state.placeOrder);
   const user = useStore((state) => state.user);
+  const pastOrders = useStore((state) => state.orders);
   const [isPlacing, setIsPlacing] = useState(false);
   const [placedOrder, setPlacedOrder] = useState(null);
+  
+  const schemes = useStore((s) => s.schemes);
+  const appliedCoupon = useStore((s) => s.appliedCoupon);
+  const setAppliedCoupon = useStore((s) => s.setAppliedCoupon);
+  const [couponInput, setCouponInput] = useState('');
+  const [couponError, setCouponError] = useState('');
 
   const cartItems = Object.keys(cart).map(id => {
     const product = products.find(p => p.id === parseInt(id));
@@ -1076,8 +1159,22 @@ function ReviewConfirmScreen({ setCurrentScreen }) {
   }).filter(i => i.id);
 
   const subtotal = cartItems.reduce((acc, item) => acc + (item.price || 0) * item.quantity, 0);
-  const gst = Math.round(subtotal * 0.12 * 100) / 100;
-  const totalValue = Math.round((subtotal + gst) * 100) / 100;
+  
+  let discountValue = 0;
+  if (appliedCoupon) {
+    if (appliedCoupon.discount_percent) {
+      discountValue = subtotal * (appliedCoupon.discount_percent / 100);
+      if (appliedCoupon.max_discount && discountValue > appliedCoupon.max_discount) {
+        discountValue = appliedCoupon.max_discount;
+      }
+    } else if (appliedCoupon.flat_discount) {
+      discountValue = appliedCoupon.flat_discount;
+    }
+  }
+
+  const discountedSubtotal = Math.max(0, subtotal - discountValue);
+  const gst = Math.round(discountedSubtotal * 0.12 * 100) / 100;
+  const totalValue = Math.round((discountedSubtotal + gst) * 100) / 100;
   const creditAvailable = (user.credit_limit || 0) - (user.credit_balance || 0);
   const hasEnoughCredit = creditAvailable >= totalValue;
 
@@ -1100,6 +1197,7 @@ function ReviewConfirmScreen({ setCurrentScreen }) {
       subtotal: subtotal,
       gst: gst,
       status: 'Placed',
+      scheme_code: appliedCoupon ? appliedCoupon.code : null,
       created_at: new Date().toISOString(),
     };
 
@@ -1184,6 +1282,73 @@ function ReviewConfirmScreen({ setCurrentScreen }) {
           ))}
         </View>
 
+        {/* Apply Coupon */}
+        <Text style={{ fontSize: 11, fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Offers & Schemes</Text>
+        <View style={{ backgroundColor: '#fff', borderRadius: 16, marginBottom: 20, padding: 16, borderWidth: 1, borderColor: '#f1f5f9' }}>
+          {appliedCoupon ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: BRAND[50], padding: 12, borderRadius: 12, borderWidth: 1, borderColor: BRAND[100] }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Ionicons name="pricetag" size={20} color={BRAND[600]} style={{ marginRight: 8 }} />
+                <View>
+                  <Text style={{ color: BRAND[800], fontWeight: '800', fontSize: 14 }}>{appliedCoupon.code} applied</Text>
+                  <Text style={{ color: BRAND[600], fontSize: 12, fontWeight: '600' }}>You saved ₹{Math.round(discountValue).toLocaleString('en-IN')}</Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => { Haptics.selectionAsync(); setAppliedCoupon(null); }}>
+                <Text style={{ color: '#dc2626', fontWeight: '800', fontSize: 13 }}>Remove</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <TextInput
+                  style={{ flex: 1, backgroundColor: '#f8fafc', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', color: '#1A1A1A', fontWeight: '700', fontSize: 15 }}
+                  placeholder="Enter scheme code"
+                  placeholderTextColor="#94a3b8"
+                  value={couponInput}
+                  onChangeText={(t) => { setCouponInput(t.toUpperCase()); setCouponError(''); }}
+                  autoCapitalize="characters"
+                />
+                <TouchableOpacity
+                  style={{ backgroundColor: couponInput.trim() ? BRAND[800] : '#e2e8f0', paddingHorizontal: 20, paddingVertical: 14, borderRadius: 12, marginLeft: 12 }}
+                  disabled={!couponInput.trim()}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    const code = couponInput.trim();
+                    if (!code) return;
+                    const scheme = schemes?.find(s => s.code === code && s.is_active);
+                    if (!scheme) {
+                      setCouponError('Invalid or inactive scheme code.');
+                      return;
+                    }
+                    if (scheme.min_order_value && subtotal < scheme.min_order_value) {
+                      setCouponError(`Min. order value of ₹${scheme.min_order_value.toLocaleString('en-IN')} required.`);
+                      return;
+                    }
+                    if (scheme.usage_limit > 0 && scheme.times_used >= scheme.usage_limit) {
+                      setCouponError('This scheme code has reached its global usage limit.');
+                      return;
+                    }
+                    if (scheme.per_user_limit > 0) {
+                      const userUsageCount = pastOrders.filter(o => o.scheme_code === scheme.code).length;
+                      if (userUsageCount >= scheme.per_user_limit) {
+                        setCouponError(`You have reached the limit of ${scheme.per_user_limit} uses for this coupon.`);
+                        return;
+                      }
+                    }
+                    setAppliedCoupon(scheme);
+                    setCouponInput('');
+                    setCouponError('');
+                  }}
+                >
+                  <Text style={{ color: couponInput.trim() ? '#fff' : '#94a3b8', fontWeight: '800', fontSize: 14 }}>Apply</Text>
+                </TouchableOpacity>
+              </View>
+              {couponError ? <Text style={{ color: '#dc2626', fontSize: 12, fontWeight: '600', marginTop: 8, marginLeft: 4 }}>{couponError}</Text> : null}
+            </View>
+          )}
+        </View>
+
         {/* Bill Summary */}
         <Text style={{ fontSize: 11, fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Bill summary</Text>
         <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: '#f1f5f9' }}>
@@ -1191,6 +1356,12 @@ function ReviewConfirmScreen({ setCurrentScreen }) {
             <Text style={{ fontSize: 14, color: '#64748b', fontWeight: '500' }}>Subtotal</Text>
             <Text style={{ fontSize: 14, color: '#1A1A1A', fontWeight: '700' }}>₹{subtotal.toLocaleString('en-IN')}</Text>
           </View>
+          {discountValue > 0 && (
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
+              <Text style={{ fontSize: 14, color: BRAND[600], fontWeight: '700' }}>Discount ({appliedCoupon?.code})</Text>
+              <Text style={{ fontSize: 14, color: BRAND[600], fontWeight: '800' }}>- ₹{Math.round(discountValue).toLocaleString('en-IN')}</Text>
+            </View>
+          )}
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
             <Text style={{ fontSize: 14, color: '#64748b', fontWeight: '500' }}>GST (12%)</Text>
             <Text style={{ fontSize: 14, color: '#1A1A1A', fontWeight: '700' }}>₹{gst.toLocaleString('en-IN')}</Text>
@@ -1682,6 +1853,7 @@ export default function App() {
       
       useStore.getState().setProducts(db.products || []);
       useStore.getState().setUsersList(db.users || []);
+      useStore.getState().setSchemes(db.schemes || []);
       setIsOfflineMode(false);
       
       const currUser = useStore.getState().user;

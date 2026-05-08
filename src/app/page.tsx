@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Bell, Package, Users, Activity, CheckCircle2, AlertCircle, Plus, Search, Layers, RefreshCcw, LogOut, Upload, FileSpreadsheet, Loader2, BarChart } from "lucide-react"
+import { Bell, Package, Users, Activity, CheckCircle2, AlertCircle, Plus, Search, Layers, RefreshCcw, LogOut, Upload, FileSpreadsheet, Loader2, BarChart, Tag, Calendar, Percent, Trash2, ToggleLeft, ToggleRight, Gift, Copy } from "lucide-react"
 
 // Recharts for Analytics
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart as RechartsBarChart, Bar, Legend } from 'recharts';
@@ -17,6 +17,7 @@ export default function Dashboard() {
   const [users, setUsers] = useState<any[]>([]);
   const [inventory, setInventory] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
+  const [schemes, setSchemes] = useState<any[]>([]);
   const [notifications, setNotifications] = useState(0);
   const [uploadingUsers, setUploadingUsers] = useState(false);
   const [uploadingProducts, setUploadingProducts] = useState(false);
@@ -31,6 +32,15 @@ export default function Dashboard() {
 
   // New Item Form State
   const [newItem, setNewItem] = useState({ name: '', company: '', category: '', body_system: '', price: '', stock: '' });
+
+  // Schemes Form State
+  const [showSchemeForm, setShowSchemeForm] = useState(false);
+  const [schemeForm, setSchemeForm] = useState({
+    title: '', description: '', code: '', scheme_type: 'Discount',
+    discount_percent: '', flat_discount: '', min_order_value: '',
+    max_discount: '', start_date: '', end_date: '', usage_limit: '', per_user_limit: '1'
+  });
+  const [savingScheme, setSavingScheme] = useState(false);
 
   const fetchLiveDB = async () => {
     try {
@@ -47,6 +57,7 @@ export default function Dashboard() {
 
         setUsers(db.users);
         setInventory(db.products);
+        if (db.schemes) setSchemes(db.schemes);
       }
     } catch (err) {
       console.error(err);
@@ -128,6 +139,59 @@ export default function Dashboard() {
     fetchLiveDB();
   };
 
+  const handleCreateScheme = async () => {
+    if (!schemeForm.title || !schemeForm.code || !schemeForm.start_date || !schemeForm.end_date) {
+      alert('Title, Code, Start Date, and End Date are required');
+      return;
+    }
+    setSavingScheme(true);
+    try {
+      const res = await fetch('/api/schemes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...schemeForm,
+          discount_percent: schemeForm.discount_percent ? Number(schemeForm.discount_percent) : null,
+          flat_discount: schemeForm.flat_discount ? Number(schemeForm.flat_discount) : null,
+          min_order_value: schemeForm.min_order_value ? Number(schemeForm.min_order_value) : 0,
+          max_discount: schemeForm.max_discount ? Number(schemeForm.max_discount) : null,
+          usage_limit: schemeForm.usage_limit ? Number(schemeForm.usage_limit) : 0,
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSchemeForm({ title: '', description: '', code: '', scheme_type: 'Discount', discount_percent: '', flat_discount: '', min_order_value: '', max_discount: '', start_date: '', end_date: '', usage_limit: '' });
+        setShowSchemeForm(false);
+        fetchLiveDB();
+      } else {
+        alert(data.error || 'Failed to create scheme');
+      }
+    } catch { alert('Network error'); }
+    setSavingScheme(false);
+  };
+
+  const handleToggleScheme = async (id: number) => {
+    await fetch('/api/schemes', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, action: 'toggle' })
+    });
+    fetchLiveDB();
+  };
+
+  const handleDeleteScheme = async (id: number) => {
+    if (!window.confirm('Delete this scheme permanently?')) return;
+    await fetch(`/api/schemes?id=${id}`, { method: 'DELETE' });
+    fetchLiveDB();
+  };
+
+  const getSchemeStatus = (scheme: any) => {
+    const today = new Date().toISOString().split('T')[0];
+    if (!scheme.is_active) return 'Disabled';
+    if (scheme.start_date > today) return 'Scheduled';
+    if (scheme.end_date < today) return 'Expired';
+    return 'Active';
+  };
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'users' | 'products') => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -326,6 +390,7 @@ export default function Dashboard() {
               <TabsTrigger value="orders" className="data-[state=active]:bg-slate-900 data-[state=active]:text-white rounded-xl px-6 font-semibold text-sm transition-all">Live Orders</TabsTrigger>
               <TabsTrigger value="users" className="data-[state=active]:bg-slate-900 data-[state=active]:text-white rounded-xl px-6 font-semibold text-sm transition-all">Credit & Partners</TabsTrigger>
               <TabsTrigger value="inventory" className="data-[state=active]:bg-slate-900 data-[state=active]:text-white rounded-xl px-6 font-semibold text-sm transition-all">Inventory Control</TabsTrigger>
+              <TabsTrigger value="schemes" className="data-[state=active]:bg-slate-900 data-[state=active]:text-white rounded-xl px-6 font-semibold text-sm transition-all flex items-center gap-2"><Tag className="w-4 h-4" /> Schemes & Offers</TabsTrigger>
               <TabsTrigger value="analytics" className="data-[state=active]:bg-slate-900 data-[state=active]:text-white rounded-xl px-6 font-semibold text-sm transition-all flex items-center gap-2"><BarChart className="w-4 h-4" /> Analytics</TabsTrigger>
             </TabsList>
           </div>
@@ -450,6 +515,7 @@ export default function Dashboard() {
                   <TableRow className="border-slate-100 hover:bg-transparent">
                     <TableHead className="text-slate-500 font-bold uppercase tracking-wider text-xs py-5 pl-8">Store Name</TableHead>
                     <TableHead className="text-slate-500 font-bold uppercase tracking-wider text-xs py-5">Contact</TableHead>
+                    <TableHead className="text-slate-500 font-bold uppercase tracking-wider text-xs py-5">Zone / District</TableHead>
                     <TableHead className="text-slate-500 font-bold uppercase tracking-wider text-xs py-5">Account Status</TableHead>
                     <TableHead className="text-slate-500 font-bold uppercase tracking-wider text-xs py-5 text-right">Credit Utilized</TableHead>
                     <TableHead className="text-slate-500 font-bold uppercase tracking-wider text-xs py-5 text-right">Invoiced Due</TableHead>
@@ -471,6 +537,13 @@ export default function Dashboard() {
                         <span className="font-bold text-slate-900 text-base">{user.store_name}</span>
                       </TableCell>
                       <TableCell className="text-slate-600 font-medium py-5 font-mono text-sm">{user.phone}</TableCell>
+                      <TableCell className="py-5">
+                        {user.city ? (
+                          <span className="text-sm font-semibold text-slate-700">{user.city}{user.zone ? <span className="text-slate-400 font-normal">, {user.zone}</span> : ''}</span>
+                        ) : (
+                          <span className="text-xs text-slate-400 italic">Not set</span>
+                        )}
+                      </TableCell>
                       <TableCell className="py-5">
                         {user.is_approved ? (
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100/50 text-emerald-700 border border-emerald-200">
@@ -668,6 +741,191 @@ export default function Dashboard() {
                   </div>
                 </div>
               </div>
+            </Card>
+          </TabsContent>
+
+          {/* SCHEMES & OFFERS TAB */}
+          <TabsContent value="schemes" className="mt-0 outline-none animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <Card className="border-0 shadow-xl shadow-slate-200/50 bg-white rounded-3xl overflow-hidden ring-1 ring-slate-100">
+              <div className="p-6 md:p-8 border-b border-slate-100 bg-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                  <h2 className="text-2xl font-bold tracking-tight text-slate-900">Schemes & Offers</h2>
+                  <p className="text-slate-500 mt-1 font-medium">Create and manage coupon codes for your B2B customers.</p>
+                </div>
+                <Button onClick={() => setShowSchemeForm(!showSchemeForm)} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-200 font-semibold rounded-xl gap-2">
+                  <Plus className="w-4 h-4" /> {showSchemeForm ? 'Cancel' : 'Create Coupon'}
+                </Button>
+              </div>
+
+              {/* Stats Row */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-6 md:px-8 md:pt-6 md:pb-2">
+                <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-5 flex items-center gap-4">
+                  <div className="p-3 bg-emerald-100 rounded-xl"><Tag className="w-5 h-5 text-emerald-700" /></div>
+                  <div>
+                    <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider">Active</p>
+                    <p className="text-2xl font-black text-emerald-800 tabular-nums">{schemes.filter(s => getSchemeStatus(s) === 'Active').length}</p>
+                  </div>
+                </div>
+                <div className="bg-amber-50 border border-amber-100 rounded-2xl p-5 flex items-center gap-4">
+                  <div className="p-3 bg-amber-100 rounded-xl"><Calendar className="w-5 h-5 text-amber-700" /></div>
+                  <div>
+                    <p className="text-xs font-bold text-amber-600 uppercase tracking-wider">Scheduled</p>
+                    <p className="text-2xl font-black text-amber-800 tabular-nums">{schemes.filter(s => getSchemeStatus(s) === 'Scheduled').length}</p>
+                  </div>
+                </div>
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 flex items-center gap-4">
+                  <div className="p-3 bg-slate-100 rounded-xl"><Gift className="w-5 h-5 text-slate-600" /></div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Coupons</p>
+                    <p className="text-2xl font-black text-slate-800 tabular-nums">{schemes.length}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Create Scheme Form */}
+              {showSchemeForm && (
+                <div className="p-6 md:px-8 bg-indigo-50/30 border-b border-indigo-100">
+                  <div className="bg-white p-6 rounded-2xl border border-indigo-200/50 shadow-sm">
+                    <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-5 flex items-center gap-2"><Tag className="w-4 h-4 text-indigo-600" /> New Coupon</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Coupon Title</label>
+                        <input type="text" placeholder="e.g. Summer Sale" value={schemeForm.title} onChange={e => setSchemeForm({...schemeForm, title: e.target.value})} className="w-full text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Coupon Code</label>
+                        <input type="text" placeholder="e.g. SAVE20" value={schemeForm.code} onChange={e => setSchemeForm({...schemeForm, code: e.target.value.toUpperCase()})} className="w-full text-sm font-bold p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none font-mono tracking-widest" />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Type</label>
+                        <select value={schemeForm.scheme_type} onChange={e => setSchemeForm({...schemeForm, scheme_type: e.target.value})} className="w-full text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                          <option value="Discount">Discount %</option>
+                          <option value="Flat">Flat ₹ Off</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                      {schemeForm.scheme_type === 'Discount' && (
+                        <div>
+                          <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Discount %</label>
+                          <input type="number" placeholder="e.g. 15" value={schemeForm.discount_percent} onChange={e => setSchemeForm({...schemeForm, discount_percent: e.target.value})} className="w-full text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                        </div>
+                      )}
+                      {schemeForm.scheme_type === 'Flat' && (
+                        <div>
+                          <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Flat Off (₹)</label>
+                          <input type="number" placeholder="e.g. 500" value={schemeForm.flat_discount} onChange={e => setSchemeForm({...schemeForm, flat_discount: e.target.value})} className="w-full text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                        </div>
+                      )}
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Min Order (₹)</label>
+                        <input type="number" placeholder="e.g. 5000" value={schemeForm.min_order_value} onChange={e => setSchemeForm({...schemeForm, min_order_value: e.target.value})} className="w-full text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Max Discount (₹)</label>
+                        <input type="number" placeholder="Optional cap" value={schemeForm.max_discount} onChange={e => setSchemeForm({...schemeForm, max_discount: e.target.value})} className="w-full text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Global Limit</label>
+                        <input type="number" placeholder="0 = unlimited" value={schemeForm.usage_limit} onChange={e => setSchemeForm({...schemeForm, usage_limit: e.target.value})} className="w-full text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Per User Limit</label>
+                        <input type="number" placeholder="0 = unlimited" value={schemeForm.per_user_limit} onChange={e => setSchemeForm({...schemeForm, per_user_limit: e.target.value})} className="w-full text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Description</label>
+                        <input type="text" placeholder="Short promo text" value={schemeForm.description} onChange={e => setSchemeForm({...schemeForm, description: e.target.value})} className="w-full text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Start Date</label>
+                        <input type="date" value={schemeForm.start_date} onChange={e => setSchemeForm({...schemeForm, start_date: e.target.value})} className="w-full text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">End Date</label>
+                        <input type="date" value={schemeForm.end_date} onChange={e => setSchemeForm({...schemeForm, end_date: e.target.value})} className="w-full text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                      </div>
+                    </div>
+                    <Button onClick={handleCreateScheme} disabled={savingScheme} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md w-full md:w-auto px-8 h-11">
+                      {savingScheme ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
+                      Create Coupon
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Schemes Table */}
+              <Table>
+                <TableHeader className="bg-slate-50/80">
+                  <TableRow className="border-slate-100 hover:bg-transparent">
+                    <TableHead className="text-slate-500 font-bold uppercase tracking-wider text-xs py-5 pl-8">Coupon</TableHead>
+                    <TableHead className="text-slate-500 font-bold uppercase tracking-wider text-xs py-5">Code</TableHead>
+                    <TableHead className="text-slate-500 font-bold uppercase tracking-wider text-xs py-5">Type / Value</TableHead>
+                    <TableHead className="text-slate-500 font-bold uppercase tracking-wider text-xs py-5">Min Order</TableHead>
+                    <TableHead className="text-slate-500 font-bold uppercase tracking-wider text-xs py-5">Validity</TableHead>
+                    <TableHead className="text-slate-500 font-bold uppercase tracking-wider text-xs py-5">Limits</TableHead>
+                    <TableHead className="text-slate-500 font-bold uppercase tracking-wider text-xs py-5 text-center">Status</TableHead>
+                    <TableHead className="text-slate-500 font-bold uppercase tracking-wider text-xs py-5 pr-8 text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {schemes.length === 0 && (
+                    <TableRow><TableCell colSpan={8} className="text-center py-16 text-slate-400 text-sm font-medium">No coupons created yet. Click "Create Coupon" to get started.</TableCell></TableRow>
+                  )}
+                  {schemes.map((scheme) => {
+                    const status = getSchemeStatus(scheme);
+                    return (
+                      <TableRow key={scheme.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                        <TableCell className="py-5 pl-8">
+                          <div className="flex flex-col">
+                            <span className="font-bold text-slate-900">{scheme.title}</span>
+                            {scheme.description && <span className="text-xs text-slate-500 mt-0.5">{scheme.description}</span>}
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-5">
+                          <span className="font-mono font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-lg text-sm tracking-wider">{scheme.code}</span>
+                        </TableCell>
+                        <TableCell className="py-5">
+                          <span className="font-bold text-slate-800">
+                            {scheme.scheme_type === 'Discount' ? `${scheme.discount_percent}% off` : `₹${scheme.flat_discount} off`}
+                          </span>
+                          {scheme.max_discount && <span className="text-xs text-slate-400 block">Max ₹{scheme.max_discount}</span>}
+                        </TableCell>
+                        <TableCell className="py-5 font-semibold text-slate-700">₹{(scheme.min_order_value || 0).toLocaleString('en-IN')}</TableCell>
+                        <TableCell className="py-5">
+                          <span className="text-xs font-semibold text-slate-600">{scheme.start_date}</span>
+                          <span className="text-xs text-slate-400"> → </span>
+                          <span className="text-xs font-semibold text-slate-600">{scheme.end_date}</span>
+                        </TableCell>
+                        <TableCell className="py-5">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-xs font-medium text-slate-500">Global: {scheme.usage_limit > 0 ? `${scheme.times_used}/${scheme.usage_limit}` : `${scheme.times_used} (Unlmt)`}</span>
+                            <span className="text-xs font-medium text-indigo-500">Per User: {scheme.per_user_limit > 0 ? scheme.per_user_limit : 'Unlmt'}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center py-5">
+                          {status === 'Active' && <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-none font-bold px-3 py-0.5 rounded-full">Active</Badge>}
+                          {status === 'Scheduled' && <Badge className="bg-amber-50 text-amber-700 border border-amber-200 shadow-none font-bold px-3 py-0.5 rounded-full">Scheduled</Badge>}
+                          {status === 'Expired' && <Badge className="bg-red-50 text-red-600 border border-red-200 shadow-none font-bold px-3 py-0.5 rounded-full">Expired</Badge>}
+                          {status === 'Disabled' && <Badge className="bg-slate-100 text-slate-500 border border-slate-200 shadow-none font-bold px-3 py-0.5 rounded-full">Disabled</Badge>}
+                        </TableCell>
+                        <TableCell className="text-right py-5 pr-8">
+                          <div className="flex justify-end gap-2">
+                            <Button size="sm" variant="ghost" onClick={() => handleToggleScheme(scheme.id)} className="h-9 rounded-xl hover:bg-slate-100 text-slate-600 font-semibold">
+                              {scheme.is_active ? <ToggleRight className="w-5 h-5 text-emerald-600" /> : <ToggleLeft className="w-5 h-5 text-slate-400" />}
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => handleDeleteScheme(scheme.id)} className="h-9 rounded-xl hover:bg-red-50 text-slate-400 hover:text-red-600">
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
             </Card>
           </TabsContent>
         </Tabs>
