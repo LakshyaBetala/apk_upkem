@@ -1698,12 +1698,6 @@ function ProfileScreen({ setCurrentScreen }) {
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [addressInput, setAddressInput] = useState(user.address || '');
   const [savingAddress, setSavingAddress] = useState(false);
-  const accountRows = [
-    { label: 'Business profile', icon: 'business-outline', value: '', action: null },
-    { label: 'Drug license & GSTIN', icon: 'document-text-outline', value: '', action: null },
-    { label: 'Saved addresses', icon: 'location-outline', value: user.address ? '1' : '0', action: () => { setAddressInput(user.address || ''); setShowAddressModal(true); } },
-    { label: 'Payment methods', icon: 'card-outline', value: '', action: null },
-  ];
 
   const handleSaveAddress = async () => {
     setSavingAddress(true);
@@ -1723,6 +1717,17 @@ function ProfileScreen({ setCurrentScreen }) {
     setSavingAddress(false);
   };
 
+  // Build info rows for business details
+  const businessDetails = [
+    { label: 'Drug License No.', value: user.drug_license, icon: 'document-text-outline' },
+    { label: 'GST Number', value: user.gst_number, icon: 'receipt-outline' },
+    { label: 'Registration No.', value: user.registration_number, icon: 'shield-checkmark-outline' },
+    { label: 'Email', value: user.email, icon: 'mail-outline' },
+    { label: 'User Type', value: user.user_type, icon: 'people-outline' },
+    { label: 'District', value: user.city, icon: 'map-outline' },
+    { label: 'Zone / State', value: user.zone, icon: 'globe-outline' },
+  ].filter(d => d.value);
+
   return (
     <View style={styles.screen}>
       <StatusBar barStyle="dark-content" />
@@ -1737,41 +1742,67 @@ function ProfileScreen({ setCurrentScreen }) {
         {/* User Card */}
         <View style={{ backgroundColor: BRAND[800], borderRadius: 20, padding: 20, marginBottom: 24, ...SHADOWS.md }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-            <View style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: BRAND[700], justifyContent: 'center', alignItems: 'center', marginRight: 14 }}>
-              <Text style={{ color: '#fff', fontWeight: '900', fontSize: 18 }}>{user.store_name?.[0]}{user.store_name?.split(' ')[1]?.[0] || ''}</Text>
+            <View style={{ width: 52, height: 52, borderRadius: 14, backgroundColor: BRAND[700], justifyContent: 'center', alignItems: 'center', marginRight: 14, borderWidth: 1.5, borderColor: BRAND[500] }}>
+              <Text style={{ color: '#fff', fontWeight: '900', fontSize: 20 }}>{user.store_name?.[0]}{user.store_name?.split(' ')[1]?.[0] || ''}</Text>
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ color: '#fff', fontSize: 18, fontWeight: '900', letterSpacing: -0.3 }}>{user.store_name}</Text>
               <Text style={{ color: BRAND[100], fontSize: 13, fontWeight: '500', marginTop: 2 }}>+91 {user.phone}</Text>
+              {user.email ? <Text style={{ color: BRAND[100], fontSize: 12, fontWeight: '500', marginTop: 1 }}>{user.email}</Text> : null}
             </View>
           </View>
-          <View style={{ flexDirection: 'row', gap: 12 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Text style={{ color: BRAND[100], fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 }}>Verified</Text>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Ionicons name="checkmark-circle" size={14} color={BRAND[500]} />
-              <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>DL · GSTIN</Text>
-            </View>
-            <View style={{ flex: 1 }} />
-            <View>
-              <Text style={{ color: BRAND[100], fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 }}>Since</Text>
-              <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}>Aug 2024</Text>
-            </View>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {user.is_approved ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(45,158,80,0.2)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 }}>
+                <Ionicons name="checkmark-circle" size={14} color={BRAND[500]} />
+                <Text style={{ color: BRAND[100], fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>Verified</Text>
+              </View>
+            ) : null}
+            {user.user_type ? (
+              <View style={{ backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 }}>
+                <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 }}>{user.user_type}</Text>
+              </View>
+            ) : null}
+            {user.city ? (
+              <View style={{ backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 }}>
+                <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>{user.city}{user.zone ? `, ${user.zone}` : ''}</Text>
+              </View>
+            ) : null}
           </View>
         </View>
 
-        {/* Account Section */}
-        <Text style={{ fontSize: 11, fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>Account</Text>
-        <View style={{ backgroundColor: '#fff', borderRadius: 16, marginBottom: 24, borderWidth: 1, borderColor: '#f1f5f9' }}>
-          {accountRows.map((row, idx) => (
-            <TouchableOpacity key={row.label} onPress={row.action} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 16, borderBottomWidth: idx < accountRows.length - 1 ? 1 : 0, borderBottomColor: '#f1f5f9' }}>
-              <Text style={{ flex: 1, fontSize: 15, fontWeight: '600', color: '#1A1A1A' }}>{row.label}</Text>
-              {row.value ? <Text style={{ fontSize: 14, color: '#94a3b8', fontWeight: '600', marginRight: 8 }}>{row.value}</Text> : null}
-              <Ionicons name="chevron-forward" size={16} color="#D1D5DB" />
-            </TouchableOpacity>
-          ))}
-        </View>
+        {/* Business & Compliance Details */}
+        {businessDetails.length > 0 && (
+          <>
+            <Text style={{ fontSize: 11, fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>Business & Compliance</Text>
+            <View style={{ backgroundColor: '#fff', borderRadius: 16, marginBottom: 24, borderWidth: 1, borderColor: '#f1f5f9' }}>
+              {businessDetails.map((item, idx) => (
+                <View key={item.label} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: idx < businessDetails.length - 1 ? 1 : 0, borderBottomColor: '#f1f5f9' }}>
+                  <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: BRAND[50], justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
+                    <Ionicons name={item.icon} size={17} color={BRAND[700]} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5 }}>{item.label}</Text>
+                    <Text style={{ fontSize: 15, fontWeight: '700', color: '#1A1A1A', marginTop: 2 }}>{item.value}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </>
+        )}
+
+        {/* Delivery Address */}
+        <Text style={{ fontSize: 11, fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>Delivery Address</Text>
+        <TouchableOpacity onPress={() => { setAddressInput(user.address || ''); setShowAddressModal(true); }} style={{ backgroundColor: '#fff', borderRadius: 16, marginBottom: 24, padding: 16, borderWidth: 1, borderColor: '#f1f5f9', flexDirection: 'row', alignItems: 'center' }}>
+          <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: BRAND[50], justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
+            <Ionicons name="location-outline" size={17} color={BRAND[700]} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: '#1A1A1A' }}>{user.address || 'No address set'}</Text>
+            {!user.address && <Text style={{ fontSize: 12, color: '#94a3b8', fontWeight: '500', marginTop: 2 }}>Tap to add your delivery address</Text>}
+          </View>
+          <Ionicons name="create-outline" size={18} color={BRAND[600]} />
+        </TouchableOpacity>
 
         {/* Activity Section */}
         <Text style={{ fontSize: 11, fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>Activity</Text>
@@ -1790,13 +1821,24 @@ function ProfileScreen({ setCurrentScreen }) {
           </View>
         </View>
 
-        {/* Preferences Section */}
-        <Text style={{ fontSize: 11, fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>Preferences</Text>
-        <View style={{ backgroundColor: '#fff', borderRadius: 16, marginBottom: 24, borderWidth: 1, borderColor: '#f1f5f9' }}>
-          <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 16 }}>
-            <Text style={{ flex: 1, fontSize: 15, fontWeight: '600', color: '#1A1A1A' }}>Notifications</Text>
-            <Ionicons name="chevron-forward" size={16} color="#D1D5DB" />
-          </TouchableOpacity>
+        {/* Credit Summary */}
+        <Text style={{ fontSize: 11, fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>Credit</Text>
+        <View style={{ backgroundColor: '#fff', borderRadius: 16, marginBottom: 24, padding: 16, borderWidth: 1, borderColor: '#f1f5f9' }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
+            <Text style={{ fontSize: 14, color: '#64748b', fontWeight: '500' }}>Credit Limit</Text>
+            <Text style={{ fontSize: 14, color: '#1A1A1A', fontWeight: '700' }}>₹{(user.credit_limit || 0).toLocaleString('en-IN')}</Text>
+          </View>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
+            <Text style={{ fontSize: 14, color: '#64748b', fontWeight: '500' }}>Used</Text>
+            <Text style={{ fontSize: 14, color: '#EA580C', fontWeight: '700' }}>₹{(user.credit_balance || 0).toLocaleString('en-IN')}</Text>
+          </View>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <Text style={{ fontSize: 14, color: '#64748b', fontWeight: '500' }}>Available</Text>
+            <Text style={{ fontSize: 14, color: BRAND[700], fontWeight: '800' }}>₹{((user.credit_limit || 0) - (user.credit_balance || 0)).toLocaleString('en-IN')}</Text>
+          </View>
+          <View style={{ height: 6, backgroundColor: '#f1f5f9', borderRadius: 3, marginTop: 12, overflow: 'hidden' }}>
+            <View style={{ height: 6, backgroundColor: (user.credit_balance / (user.credit_limit || 1)) > 0.9 ? '#ef4444' : BRAND[600], borderRadius: 3, width: `${Math.min(((user.credit_balance || 0) / (user.credit_limit || 1)) * 100, 100)}%` }} />
+          </View>
         </View>
 
         {/* Logout */}

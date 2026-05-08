@@ -229,7 +229,7 @@ export default function Dashboard() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'Placed': return <Badge className="bg-amber-100/50 text-amber-700 hover:bg-amber-100 border border-amber-200/50 shadow-none font-semibold px-3 py-0.5 rounded-full"><Activity className="w-3 h-3 mr-1.5" /> Placed</Badge>;
-      case 'Accepted': return <Badge className="bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200/50 shadow-none font-semibold px-3 py-0.5 rounded-full"><CheckCircle2 className="w-3 h-3 mr-1.5" /> Accepted</Badge>;
+      case 'Accepted': return <Badge className="bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200/50 shadow-none font-semibold px-3 py-0.5 rounded-full"><CheckCircle2 className="w-3 h-3 mr-1.5" /> Accepted</Badge>;
       case 'Processing': return <Badge className="bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200/50 shadow-none font-semibold px-3 py-0.5 rounded-full"><RefreshCcw className="w-3 h-3 mr-1.5 animate-spin-slow" /> Processing</Badge>;
       case 'Shipped': return <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200/50 shadow-none font-semibold px-3 py-0.5 rounded-full"><Package className="w-3 h-3 mr-1.5" /> Shipped</Badge>;
       default: return <Badge variant="outline" className="text-slate-500">{status}</Badge>;
@@ -294,18 +294,18 @@ export default function Dashboard() {
     .slice(0, 5);
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 font-sans selection:bg-indigo-100 selection:text-indigo-900">
-      <header className="bg-slate-950 text-white border-b border-slate-800 shadow-sm sticky top-0 z-50">
+    <div className="min-h-screen bg-[#F0F5F3] text-slate-900 font-sans selection:bg-emerald-100 selection:text-emerald-900">
+      <header className="upkem-header-gradient text-white border-b border-emerald-900/50 shadow-sm sticky top-0 z-50">
         <div className="max-w-[1400px] mx-auto px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 border border-indigo-400/30">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-600 to-emerald-700 flex items-center justify-center shadow-lg shadow-emerald-500/20 border border-emerald-400/30">
               <Layers className="text-white w-5 h-5" />
             </div>
             <div>
               <h1 className="text-xl font-black tracking-tight text-white flex items-center gap-2">
                 UPKEM LABS
                 <span className="text-slate-500 font-medium text-lg">/</span>
-                <span className="text-indigo-400 font-medium tracking-normal text-sm uppercase tracking-widest mt-0.5">Command Center</span>
+                <span className="text-emerald-400 font-medium tracking-normal text-sm uppercase tracking-widest mt-0.5">Command Center</span>
               </h1>
             </div>
           </div>
@@ -319,17 +319,17 @@ export default function Dashboard() {
               System Live
             </div>
             <div className="relative cursor-pointer group" onClick={() => setNotifications(0)}>
-              <div className="p-2.5 bg-slate-800/50 rounded-full group-hover:bg-slate-800 transition-colors border border-slate-700/50">
+              <div className="p-2.5 bg-white/10 rounded-full group-hover:bg-white/15 transition-colors border border-white/10">
                 <Bell className="w-5 h-5 text-slate-300 group-hover:text-white transition-colors" />
               </div>
               {notifications > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-indigo-500 text-[11px] font-bold text-white shadow-lg shadow-indigo-500/30 border-2 border-slate-950">
+                <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-400 text-[11px] font-bold text-emerald-950 shadow-lg shadow-emerald-500/30 border-2 border-emerald-900">
                   {notifications}
                 </span>
               )}
             </div>
-            <div className="h-8 w-px bg-slate-800 mx-2"></div>
-            <Button variant="ghost" onClick={handleLogout} className="text-slate-300 hover:text-white hover:bg-slate-800 gap-2 h-10 px-3 rounded-lg">
+            <div className="h-8 w-px bg-white/10 mx-2"></div>
+            <Button variant="ghost" onClick={handleLogout} className="text-emerald-200 hover:text-white hover:bg-white/10 gap-2 h-10 px-3 rounded-lg">
               <LogOut className="w-4 h-4" />
               <span className="text-sm font-semibold hidden md:inline">Logout</span>
             </Button>
@@ -339,22 +339,22 @@ export default function Dashboard() {
 
       <main className="max-w-[1400px] mx-auto px-6 py-10">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-          <Card className="bg-white border-0 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] rounded-2xl overflow-hidden group">
-            <div className="h-1.5 w-full bg-indigo-600"></div>
+          <Card className="bg-white border-0 shadow-[0_2px_10px_-3px_rgba(27,67,50,0.12)] rounded-2xl overflow-hidden group">
+            <div className="h-1.5 w-full bg-emerald-700"></div>
             <CardContent className="p-6">
               <div className="flex justify-between items-start">
                 <div>
                   <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-1">Retail Partners</p>
                   <h3 className="text-4xl font-black text-slate-900 tracking-tight tabular-nums">{users.length}</h3>
                 </div>
-                <div className="p-3 bg-indigo-50 rounded-xl group-hover:scale-110 transition-transform">
-                  <Users className="w-6 h-6 text-indigo-600" />
+                <div className="p-3 bg-emerald-50 rounded-xl group-hover:scale-110 transition-transform">
+                  <Users className="w-6 h-6 text-emerald-700" />
                 </div>
               </div>
             </CardContent>
           </Card>
           
-          <Card className="bg-white border-0 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] rounded-2xl overflow-hidden group">
+          <Card className="bg-white border-0 shadow-[0_2px_10px_-3px_rgba(27,67,50,0.12)] rounded-2xl overflow-hidden group">
             <div className="h-1.5 w-full bg-emerald-500"></div>
             <CardContent className="p-6">
               <div className="flex justify-between items-start">
@@ -369,7 +369,7 @@ export default function Dashboard() {
             </CardContent>
           </Card>
           
-          <Card className="bg-white border-0 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] rounded-2xl overflow-hidden group">
+          <Card className="bg-white border-0 shadow-[0_2px_10px_-3px_rgba(27,67,50,0.12)] rounded-2xl overflow-hidden group">
             <div className="h-1.5 w-full bg-slate-900"></div>
             <CardContent className="p-6">
               <div className="flex justify-between items-start">
@@ -388,11 +388,11 @@ export default function Dashboard() {
         <Tabs defaultValue="orders" className="w-full">
           <div className="flex justify-between items-end mb-8">
             <TabsList className="h-14 bg-white border border-slate-200/60 p-1.5 rounded-2xl shadow-sm inline-flex overflow-x-auto max-w-full">
-              <TabsTrigger value="orders" className="data-[state=active]:bg-slate-900 data-[state=active]:text-white rounded-xl px-6 font-semibold text-sm transition-all">Live Orders</TabsTrigger>
-              <TabsTrigger value="users" className="data-[state=active]:bg-slate-900 data-[state=active]:text-white rounded-xl px-6 font-semibold text-sm transition-all">Credit & Partners</TabsTrigger>
-              <TabsTrigger value="inventory" className="data-[state=active]:bg-slate-900 data-[state=active]:text-white rounded-xl px-6 font-semibold text-sm transition-all">Inventory Control</TabsTrigger>
-              <TabsTrigger value="schemes" className="data-[state=active]:bg-slate-900 data-[state=active]:text-white rounded-xl px-6 font-semibold text-sm transition-all flex items-center gap-2"><Tag className="w-4 h-4" /> Schemes & Offers</TabsTrigger>
-              <TabsTrigger value="analytics" className="data-[state=active]:bg-slate-900 data-[state=active]:text-white rounded-xl px-6 font-semibold text-sm transition-all flex items-center gap-2"><BarChart className="w-4 h-4" /> Analytics</TabsTrigger>
+              <TabsTrigger value="orders" className="data-[state=active]:bg-emerald-800 data-[state=active]:text-white rounded-xl px-6 font-semibold text-sm transition-all">Live Orders</TabsTrigger>
+              <TabsTrigger value="users" className="data-[state=active]:bg-emerald-800 data-[state=active]:text-white rounded-xl px-6 font-semibold text-sm transition-all">Credit & Partners</TabsTrigger>
+              <TabsTrigger value="inventory" className="data-[state=active]:bg-emerald-800 data-[state=active]:text-white rounded-xl px-6 font-semibold text-sm transition-all">Inventory Control</TabsTrigger>
+              <TabsTrigger value="schemes" className="data-[state=active]:bg-emerald-800 data-[state=active]:text-white rounded-xl px-6 font-semibold text-sm transition-all flex items-center gap-2"><Tag className="w-4 h-4" /> Schemes & Offers</TabsTrigger>
+              <TabsTrigger value="analytics" className="data-[state=active]:bg-emerald-800 data-[state=active]:text-white rounded-xl px-6 font-semibold text-sm transition-all flex items-center gap-2"><BarChart className="w-4 h-4" /> Analytics</TabsTrigger>
             </TabsList>
           </div>
           
@@ -447,7 +447,7 @@ export default function Dashboard() {
                           <div className="flex flex-wrap gap-1.5">
                             {o.items?.map((item: any, idx: number) => (
                               <div key={idx} className="bg-slate-100 border border-slate-200/60 rounded-md px-2 py-1 text-[11px] font-medium text-slate-700 flex items-center gap-1.5">
-                                {item.name} <span className="bg-white px-1.5 py-0.5 rounded text-indigo-700 font-bold shadow-sm">x{item.quantity}</span>
+                                {item.name} <span className="bg-white px-1.5 py-0.5 rounded text-emerald-800 font-bold shadow-sm">x{item.quantity}</span>
                               </div>
                             ))}
                           </div>
@@ -467,7 +467,7 @@ export default function Dashboard() {
                           <div className="flex justify-end gap-2 opacity-100 transition-opacity">
                             {o.status === "Placed" && (
                               <>
-                                <Button size="sm" onClick={() => handleUpdateOrderStatus(o.id, 'Accepted')} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-200 font-semibold h-9 px-4 rounded-xl transition-all hover:scale-105 active:scale-95">Accept</Button>
+                                <Button size="sm" onClick={() => handleUpdateOrderStatus(o.id, 'Accepted')} className="bg-emerald-700 hover:bg-emerald-800 text-white shadow-md shadow-emerald-200 font-semibold h-9 px-4 rounded-xl transition-all hover:scale-105 active:scale-95">Accept</Button>
                                 <Button size="sm" onClick={() => handleUpdateOrderStatus(o.id, 'Rejected')} className="bg-white border-2 border-slate-200 text-slate-700 hover:border-red-500 hover:text-red-600 font-semibold h-9 px-4 rounded-xl transition-all">Reject</Button>
                               </>
                             )}
@@ -501,11 +501,11 @@ export default function Dashboard() {
                 </div>
                 <div className="flex gap-3">
                   <input type="file" accept=".xlsx, .xls" className="hidden" ref={userFileInput} onChange={(e) => handleFileUpload(e, 'users')} />
-                  <Button variant="outline" className="border-indigo-200 text-indigo-700 hover:bg-indigo-50" onClick={() => window.open('/templates/Users_Upload_Template.xlsx', '_blank')}>
+                  <Button variant="outline" className="border-emerald-200 text-emerald-800 hover:bg-emerald-50" onClick={() => window.open('/templates/Users_Upload_Template.xlsx', '_blank')}>
                     <FileSpreadsheet className="w-4 h-4 mr-2" />
                     Template
                   </Button>
-                  <Button className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-200" onClick={() => userFileInput.current?.click()} disabled={uploadingUsers}>
+                  <Button className="bg-emerald-700 hover:bg-emerald-800 text-white shadow-md shadow-emerald-200" onClick={() => userFileInput.current?.click()} disabled={uploadingUsers}>
                     {uploadingUsers ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
                     Bulk Upload Clients
                   </Button>
@@ -562,7 +562,7 @@ export default function Dashboard() {
                             ₹{user.credit_balance.toLocaleString('en-IN')} <span className="text-slate-400 font-medium text-xs">/ {user.credit_limit.toLocaleString('en-IN')}</span>
                           </span>
                           <div className="w-32 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                            <div className={`h-full rounded-full ${creditPercentage > 90 ? 'bg-red-500' : 'bg-indigo-500'}`} style={{ width: `${Math.min(creditPercentage, 100)}%` }}></div>
+                            <div className={`h-full rounded-full ${creditPercentage > 90 ? 'bg-red-500' : 'bg-emerald-600'}`} style={{ width: `${Math.min(creditPercentage, 100)}%` }}></div>
                           </div>
                         </div>
                       </TableCell>
@@ -601,7 +601,7 @@ export default function Dashboard() {
                 </div>
                 <div className="flex gap-3">
                   <input type="file" accept=".xlsx, .xls" className="hidden" ref={productFileInput} onChange={(e) => handleFileUpload(e, 'products')} />
-                  <Button variant="outline" className="border-indigo-200 text-indigo-700 hover:bg-indigo-50" onClick={() => window.open('/templates/Products_Upload_Template.xlsx', '_blank')}>
+                  <Button variant="outline" className="border-emerald-200 text-emerald-800 hover:bg-emerald-50" onClick={() => window.open('/templates/Products_Upload_Template.xlsx', '_blank')}>
                     <FileSpreadsheet className="w-4 h-4 mr-2" />
                     Template
                   </Button>
@@ -615,45 +615,45 @@ export default function Dashboard() {
               <div className="p-6 md:p-8 bg-slate-50/50 border-b border-slate-100">
                 <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm shadow-slate-100 mb-6">
                   <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-                    <Plus className="w-4 h-4 text-indigo-600"/> Add New SKU
+                    <Plus className="w-4 h-4 text-emerald-700"/> Add New SKU
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
                     <div className="col-span-2">
                       <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Product Name</label>
-                      <input type="text" placeholder="e.g. Paracetamol 500mg" value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} className="w-full text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all" />
+                      <input type="text" placeholder="e.g. Paracetamol 500mg" value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} className="w-full text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none transition-all" />
                     </div>
                     <div>
                       <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Manufacturer</label>
-                      <input type="text" placeholder="e.g. GSK" value={newItem.company} onChange={e => setNewItem({...newItem, company: e.target.value})} className="w-full text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all" />
+                      <input type="text" placeholder="e.g. GSK" value={newItem.company} onChange={e => setNewItem({...newItem, company: e.target.value})} className="w-full text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none transition-all" />
                     </div>
                     <div>
                       <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Category / Body</label>
                       <div className="flex gap-2">
-                        <input type="text" placeholder="Category" value={newItem.category} onChange={e => setNewItem({...newItem, category: e.target.value})} className="w-1/2 text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all" />
-                        <input type="text" placeholder="System" value={newItem.body_system} onChange={e => setNewItem({...newItem, body_system: e.target.value})} className="w-1/2 text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all" />
+                        <input type="text" placeholder="Category" value={newItem.category} onChange={e => setNewItem({...newItem, category: e.target.value})} className="w-1/2 text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none transition-all" />
+                        <input type="text" placeholder="System" value={newItem.body_system} onChange={e => setNewItem({...newItem, body_system: e.target.value})} className="w-1/2 text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none transition-all" />
                       </div>
                     </div>
                     <div>
                       <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Price / Stock</label>
                       <div className="flex gap-2">
-                        <input type="number" placeholder="₹" value={newItem.price} onChange={e => setNewItem({...newItem, price: e.target.value})} className="w-1/2 text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all" />
-                        <input type="number" placeholder="Qty" value={newItem.stock} onChange={e => setNewItem({...newItem, stock: e.target.value})} className="w-1/2 text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all" />
+                        <input type="number" placeholder="₹" value={newItem.price} onChange={e => setNewItem({...newItem, price: e.target.value})} className="w-1/2 text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none transition-all" />
+                        <input type="number" placeholder="Qty" value={newItem.stock} onChange={e => setNewItem({...newItem, stock: e.target.value})} className="w-1/2 text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none transition-all" />
                       </div>
                     </div>
-                    <Button onClick={handleAddNewProduct} className="bg-slate-900 hover:bg-indigo-600 text-white font-bold h-[46px] rounded-xl shadow-md transition-all w-full">Create</Button>
+                    <Button onClick={handleAddNewProduct} className="bg-slate-900 hover:bg-emerald-700 text-white font-bold h-[46px] rounded-xl shadow-md transition-all w-full">Create</Button>
                   </div>
                 </div>
 
                 <div className="flex flex-col md:flex-row gap-4 mb-2">
                   <div className="relative flex-1">
                     <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input type="text" placeholder="Search by name or company..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-shadow shadow-sm" />
+                    <input type="text" placeholder="Search by name or company..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-emerald-600 focus:outline-none transition-shadow shadow-sm" />
                   </div>
-                  <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="py-2.5 px-4 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none shadow-sm md:w-48">
+                  <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="py-2.5 px-4 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-emerald-600 focus:outline-none shadow-sm md:w-48">
                     <option value="">All Categories</option>
                     {uniqueCategories.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
-                  <select value={bodySystemFilter} onChange={e => setBodySystemFilter(e.target.value)} className="py-2.5 px-4 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none shadow-sm md:w-48">
+                  <select value={bodySystemFilter} onChange={e => setBodySystemFilter(e.target.value)} className="py-2.5 px-4 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-emerald-600 focus:outline-none shadow-sm md:w-48">
                     <option value="">All Body Systems</option>
                     {uniqueSystems.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
@@ -675,7 +675,7 @@ export default function Dashboard() {
                       <TableCell className="py-4 pl-8">
                         <div className="flex flex-col">
                           <span className="font-bold text-slate-900 text-base tracking-tight">{product.name}</span>
-                          <span className="text-xs font-semibold text-indigo-600">{product.company} &bull; <span className="text-slate-400">{product.category} {product.body_system !== 'General' && `(${product.body_system})`}</span></span>
+                          <span className="text-xs font-semibold text-emerald-700">{product.company} &bull; <span className="text-slate-400">{product.category} {product.body_system !== 'General' && `(${product.body_system})`}</span></span>
                         </div>
                       </TableCell>
                       <TableCell className="text-right py-4 font-black text-slate-900 tabular-nums">
@@ -713,7 +713,7 @@ export default function Dashboard() {
               
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100">
-                  <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2"><Activity className="w-5 h-5 text-indigo-500"/> Revenue Trend (Last 7 Active Days)</h3>
+                  <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2"><Activity className="w-5 h-5 text-emerald-700"/> Revenue Trend (Last 7 Active Days)</h3>
                   <div className="h-64 w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={revenueData}>
@@ -753,7 +753,7 @@ export default function Dashboard() {
                   <h2 className="text-2xl font-bold tracking-tight text-slate-900">Schemes & Offers</h2>
                   <p className="text-slate-500 mt-1 font-medium">Create and manage coupon codes for your B2B customers.</p>
                 </div>
-                <Button onClick={() => setShowSchemeForm(!showSchemeForm)} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-200 font-semibold rounded-xl gap-2">
+                <Button onClick={() => setShowSchemeForm(!showSchemeForm)} className="bg-emerald-700 hover:bg-emerald-800 text-white shadow-md shadow-emerald-200 font-semibold rounded-xl gap-2">
                   <Plus className="w-4 h-4" /> {showSchemeForm ? 'Cancel' : 'Create Coupon'}
                 </Button>
               </div>
@@ -785,21 +785,21 @@ export default function Dashboard() {
 
               {/* Create Scheme Form */}
               {showSchemeForm && (
-                <div className="p-6 md:px-8 bg-indigo-50/30 border-b border-indigo-100">
-                  <div className="bg-white p-6 rounded-2xl border border-indigo-200/50 shadow-sm">
-                    <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-5 flex items-center gap-2"><Tag className="w-4 h-4 text-indigo-600" /> New Coupon</h3>
+                <div className="p-6 md:px-8 bg-emerald-50/40 border-b border-emerald-100">
+                  <div className="bg-white p-6 rounded-2xl border border-emerald-200/50 shadow-sm">
+                    <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-5 flex items-center gap-2"><Tag className="w-4 h-4 text-emerald-700" /> New Coupon</h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                       <div>
                         <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Coupon Title</label>
-                        <input type="text" placeholder="e.g. Summer Sale" value={schemeForm.title} onChange={e => setSchemeForm({...schemeForm, title: e.target.value})} className="w-full text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                        <input type="text" placeholder="e.g. Summer Sale" value={schemeForm.title} onChange={e => setSchemeForm({...schemeForm, title: e.target.value})} className="w-full text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none" />
                       </div>
                       <div>
                         <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Coupon Code</label>
-                        <input type="text" placeholder="e.g. SAVE20" value={schemeForm.code} onChange={e => setSchemeForm({...schemeForm, code: e.target.value.toUpperCase()})} className="w-full text-sm font-bold p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none font-mono tracking-widest" />
+                        <input type="text" placeholder="e.g. SAVE20" value={schemeForm.code} onChange={e => setSchemeForm({...schemeForm, code: e.target.value.toUpperCase()})} className="w-full text-sm font-bold p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none font-mono tracking-widest" />
                       </div>
                       <div>
                         <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Type</label>
-                        <select value={schemeForm.scheme_type} onChange={e => setSchemeForm({...schemeForm, scheme_type: e.target.value})} className="w-full text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                        <select value={schemeForm.scheme_type} onChange={e => setSchemeForm({...schemeForm, scheme_type: e.target.value})} className="w-full text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-600 focus:outline-none">
                           <option value="Discount">Discount %</option>
                           <option value="Flat">Flat ₹ Off</option>
                         </select>
@@ -809,47 +809,47 @@ export default function Dashboard() {
                       {schemeForm.scheme_type === 'Discount' && (
                         <div>
                           <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Discount %</label>
-                          <input type="number" placeholder="e.g. 15" value={schemeForm.discount_percent} onChange={e => setSchemeForm({...schemeForm, discount_percent: e.target.value})} className="w-full text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                          <input type="number" placeholder="e.g. 15" value={schemeForm.discount_percent} onChange={e => setSchemeForm({...schemeForm, discount_percent: e.target.value})} className="w-full text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none" />
                         </div>
                       )}
                       {schemeForm.scheme_type === 'Flat' && (
                         <div>
                           <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Flat Off (₹)</label>
-                          <input type="number" placeholder="e.g. 500" value={schemeForm.flat_discount} onChange={e => setSchemeForm({...schemeForm, flat_discount: e.target.value})} className="w-full text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                          <input type="number" placeholder="e.g. 500" value={schemeForm.flat_discount} onChange={e => setSchemeForm({...schemeForm, flat_discount: e.target.value})} className="w-full text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none" />
                         </div>
                       )}
                       <div>
                         <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Min Order (₹)</label>
-                        <input type="number" placeholder="e.g. 5000" value={schemeForm.min_order_value} onChange={e => setSchemeForm({...schemeForm, min_order_value: e.target.value})} className="w-full text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                        <input type="number" placeholder="e.g. 5000" value={schemeForm.min_order_value} onChange={e => setSchemeForm({...schemeForm, min_order_value: e.target.value})} className="w-full text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none" />
                       </div>
                       <div>
                         <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Max Discount (₹)</label>
-                        <input type="number" placeholder="Optional cap" value={schemeForm.max_discount} onChange={e => setSchemeForm({...schemeForm, max_discount: e.target.value})} className="w-full text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                        <input type="number" placeholder="Optional cap" value={schemeForm.max_discount} onChange={e => setSchemeForm({...schemeForm, max_discount: e.target.value})} className="w-full text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none" />
                       </div>
                       <div>
                         <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Global Limit</label>
-                        <input type="number" placeholder="0 = unlimited" value={schemeForm.usage_limit} onChange={e => setSchemeForm({...schemeForm, usage_limit: e.target.value})} className="w-full text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                        <input type="number" placeholder="0 = unlimited" value={schemeForm.usage_limit} onChange={e => setSchemeForm({...schemeForm, usage_limit: e.target.value})} className="w-full text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none" />
                       </div>
                       <div>
                         <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Per User Limit</label>
-                        <input type="number" placeholder="0 = unlimited" value={schemeForm.per_user_limit} onChange={e => setSchemeForm({...schemeForm, per_user_limit: e.target.value})} className="w-full text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                        <input type="number" placeholder="0 = unlimited" value={schemeForm.per_user_limit} onChange={e => setSchemeForm({...schemeForm, per_user_limit: e.target.value})} className="w-full text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none" />
                       </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                       <div>
                         <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Description</label>
-                        <input type="text" placeholder="Short promo text" value={schemeForm.description} onChange={e => setSchemeForm({...schemeForm, description: e.target.value})} className="w-full text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                        <input type="text" placeholder="Short promo text" value={schemeForm.description} onChange={e => setSchemeForm({...schemeForm, description: e.target.value})} className="w-full text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none" />
                       </div>
                       <div>
                         <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Start Date</label>
-                        <input type="date" value={schemeForm.start_date} onChange={e => setSchemeForm({...schemeForm, start_date: e.target.value})} className="w-full text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                        <input type="date" value={schemeForm.start_date} onChange={e => setSchemeForm({...schemeForm, start_date: e.target.value})} className="w-full text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-600 focus:outline-none" />
                       </div>
                       <div>
                         <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">End Date</label>
-                        <input type="date" value={schemeForm.end_date} onChange={e => setSchemeForm({...schemeForm, end_date: e.target.value})} className="w-full text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                        <input type="date" value={schemeForm.end_date} onChange={e => setSchemeForm({...schemeForm, end_date: e.target.value})} className="w-full text-sm font-medium p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-600 focus:outline-none" />
                       </div>
                     </div>
-                    <Button onClick={handleCreateScheme} disabled={savingScheme} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md w-full md:w-auto px-8 h-11">
+                    <Button onClick={handleCreateScheme} disabled={savingScheme} className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl shadow-md w-full md:w-auto px-8 h-11">
                       {savingScheme ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
                       Create Coupon
                     </Button>
@@ -886,7 +886,7 @@ export default function Dashboard() {
                           </div>
                         </TableCell>
                         <TableCell className="py-5">
-                          <span className="font-mono font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-lg text-sm tracking-wider">{scheme.code}</span>
+                          <span className="font-mono font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg text-sm tracking-wider">{scheme.code}</span>
                         </TableCell>
                         <TableCell className="py-5">
                           <span className="font-bold text-slate-800">
@@ -903,7 +903,7 @@ export default function Dashboard() {
                         <TableCell className="py-5">
                           <div className="flex flex-col gap-1">
                             <span className="text-xs font-medium text-slate-500">Global: {scheme.usage_limit > 0 ? `${scheme.times_used}/${scheme.usage_limit}` : `${scheme.times_used} (Unlmt)`}</span>
-                            <span className="text-xs font-medium text-indigo-500">Per User: {scheme.per_user_limit > 0 ? scheme.per_user_limit : 'Unlmt'}</span>
+                            <span className="text-xs font-medium text-emerald-700">Per User: {scheme.per_user_limit > 0 ? scheme.per_user_limit : 'Unlmt'}</span>
                           </div>
                         </TableCell>
                         <TableCell className="text-center py-5">
