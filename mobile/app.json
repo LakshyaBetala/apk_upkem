@@ -10,18 +10,25 @@
     "splash": {
       "image": "./assets/pharma_logo.jpeg",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#0B2618"
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.upkemlabs.b2b"
+      "bundleIdentifier": "com.upkemlabs.b2b",
+      "infoPlist": {
+        "NSCameraUsageDescription": "UPKEM LABS needs camera access for document scanning.",
+        "UIBackgroundModes": ["remote-notification"]
+      }
     },
     "android": {
       "package": "com.upkemlabs.b2b",
       "adaptiveIcon": {
         "foregroundImage": "./assets/pharma_logo.jpeg",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#0B2618"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
     },
     "extra": {
       "eas": {

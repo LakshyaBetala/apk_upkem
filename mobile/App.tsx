@@ -5,7 +5,8 @@ enableScreens(false);
 import { 
   StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, 
   FlatList, Image, Modal, KeyboardAvoidingView, Platform, ScrollView,
-  LayoutAnimation, UIManager, Animated, Easing, Keyboard, StatusBar
+  LayoutAnimation, UIManager, Animated, Easing, Keyboard, StatusBar,
+  Dimensions, RefreshControl, ActivityIndicator
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { create } from 'zustand';
@@ -16,6 +17,8 @@ import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // Notification Handler
 Notifications.setNotificationHandler({
@@ -31,7 +34,26 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 }
 
 const DEFAULT_IP = '192.168.1.100';
-const MIN_ORDER_VALUE = 5000;
+const MIN_ORDER_VALUE = 2500;
+
+// UPKEM / UPKAR PHARMA company details for invoice
+const COMPANY = {
+  name: 'UPKAR PHARMA DISTRIBUTORS',
+  brand: 'UPKEM LABS',
+  address: 'NO.47, GROUND FLOOR, 1ST STREET,\nVAIDYNATHA MUDALI STREET, CHENNAI 600079',
+  email: 'UPKARPHARMONISTRIBUTORS@GMAIL.COM',
+  mobile: '9840895791',
+  gstin: '33BACPV0654A1Z6',
+  dl_no: 'TN-02-20B-00081 / TN-02-21B-00081',
+  bank: {
+    name: 'KOTAK MAHINDRA BANK',
+    branch: 'G.N.STREET',
+    ac_no: '9840895791',
+    ifsc: 'KKBK0008497',
+  },
+};
+
+const APP_VERSION = '1.0.0';
 
 // Premium Shadow System
 // UPKEM Brand Colors
@@ -99,6 +121,233 @@ const DEFAULT_PRODUCT_IMAGE = 'https://images.unsplash.com/photo-1587854692152-c
 const getProductImage = (product: any) => CATEGORY_IMAGES[product.category] || DEFAULT_PRODUCT_IMAGE;
 const getTimeOfDay = () => { const h = new Date().getHours(); return h < 12 ? 'Morning' : h < 17 ? 'Afternoon' : 'Evening'; };
 
+// --- Number to Words (Indian system) ---
+const numberToWords = (num: number): string => {
+  if (num === 0) return 'ZERO';
+  const ones = ['','ONE','TWO','THREE','FOUR','FIVE','SIX','SEVEN','EIGHT','NINE','TEN',
+    'ELEVEN','TWELVE','THIRTEEN','FOURTEEN','FIFTEEN','SIXTEEN','SEVENTEEN','EIGHTEEN','NINETEEN'];
+  const tens = ['','','TWENTY','THIRTY','FORTY','FIFTY','SIXTY','SEVENTY','EIGHTY','NINETY'];
+  const convert = (n: number): string => {
+    if (n < 20) return ones[n];
+    if (n < 100) return tens[Math.floor(n/10)] + (n%10 ? ' ' + ones[n%10] : '');
+    if (n < 1000) return ones[Math.floor(n/100)] + ' HUNDRED' + (n%100 ? ' ' + convert(n%100) : '');
+    if (n < 100000) return convert(Math.floor(n/1000)) + ' THOUSAND' + (n%1000 ? ' ' + convert(n%1000) : '');
+    if (n < 10000000) return convert(Math.floor(n/100000)) + ' LAKH' + (n%100000 ? ' ' + convert(n%100000) : '');
+    return convert(Math.floor(n/10000000)) + ' CRORE' + (n%10000000 ? ' ' + convert(n%10000000) : '');
+  };
+  const rupees = Math.floor(num);
+  const paise = Math.round((num - rupees) * 100);
+  let result = convert(rupees) + ' RUPEES';
+  if (paise > 0) result += ' AND ' + convert(paise) + ' PAISE';
+  return result + ' ONLY';
+};
+
+// --- Professional GST Invoice Generator (matches UPKAR format) ---
+const generateInvoiceHTML = (order: any, user: any) => {
+  const invoiceNo = order.id?.replace('UPK-', 'UPD') || 'UPD' + Math.floor(1000 + Math.random() * 9000);
+  const invoiceDate = order.date || new Date().toLocaleDateString('en-GB');
+  const dueDate = (() => { const d = new Date(); d.setDate(d.getDate() + 60); return d.toLocaleDateString('en-GB'); })();
+  
+  const subtotal = order.subtotal || order.items?.reduce((a, i) => a + (i.price || 0) * (i.quantity || 0), 0) || 0;
+  const discount = order.discount_value || 0;
+  const taxableValue = subtotal - discount;
+  const gstAmount = order.gst || Math.round(taxableValue * 0.12 * 100) / 100;
+  const cgst = Math.round(gstAmount / 2 * 100) / 100;
+  const sgst = Math.round(gstAmount / 2 * 100) / 100;
+  const netAmount = Math.round(order.total || (taxableValue + gstAmount));
+  const roundOff = Math.round((netAmount - (taxableValue + gstAmount)) * 100) / 100;
+
+  const itemRows = (order.items || []).map((item, idx) => `
+    <tr>
+      <td style="text-align:center;">${idx + 1}</td>
+      <td><strong>${item.name}</strong></td>
+      <td style="text-align:center;">${item.packing || '1×10'}</td>
+      <td style="text-align:center;">${item.company || '-'}</td>
+      <td style="text-align:center;">${item.hsn || '30049099'}</td>
+      <td style="text-align:center;">${item.batch || '-'}</td>
+      <td style="text-align:center;">${item.expiry || '-'}</td>
+      <td style="text-align:center;">${item.quantity}</td>
+      <td style="text-align:center;">${item.free || 0}</td>
+      <td style="text-align:right;">₹${(item.mrp || Math.round((item.price_ptr || item.price) * 1.2)).toFixed(2)}</td>
+      <td style="text-align:right;">₹${(item.price_ptr || item.price).toFixed(2)}</td>
+      <td style="text-align:center;">${item.discount || 0}%</td>
+      <td style="text-align:center;">5%</td>
+      <td style="text-align:right;">₹${((item.price || 0) * (item.quantity || 0)).toFixed(2)}</td>
+    </tr>
+  `).join('');
+
+  const totalQty = (order.items || []).reduce((a, i) => a + (i.quantity || 0), 0);
+
+  return `
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 11px; color: #1a1a1a; padding: 16px; }
+      .invoice-border { border: 2px solid #1a1a1a; }
+      .header-row { display: flex; border-bottom: 2px solid #1a1a1a; }
+      .company-section { flex: 2; padding: 12px; border-right: 2px solid #1a1a1a; }
+      .company-name { font-size: 18px; font-weight: 900; text-align: center; margin-bottom: 4px; letter-spacing: 1px; }
+      .company-addr { font-size: 10px; text-align: center; line-height: 1.5; color: #333; }
+      .company-gst { font-size: 10px; margin-top: 4px; text-align: center; font-weight: 700; }
+      .bank-section { flex: 1; padding: 8px; font-size: 10px; }
+      .bank-title { font-weight: 900; font-size: 11px; text-align: center; border-bottom: 1px solid #ccc; padding-bottom: 4px; margin-bottom: 4px; }
+      .bank-row { display: flex; justify-content: space-between; padding: 1px 0; }
+      .bank-label { font-weight: 700; color: #555; }
+      
+      .buyer-row { display: flex; border-bottom: 2px solid #1a1a1a; }
+      .buyer-section { flex: 1; padding: 8px; border-right: 2px solid #1a1a1a; font-size: 10px; line-height: 1.6; }
+      .buyer-section:last-child { border-right: none; }
+      .invoice-title { text-align: center; font-size: 14px; font-weight: 900; padding: 6px; background: #f0fff4; border-bottom: 1px solid #1a1a1a; letter-spacing: 2px; }
+      .meta-label { font-weight: 700; color: #555; display: inline-block; min-width: 80px; }
+      .meta-value { font-weight: 700; color: #1a1a1a; }
+      
+      table { width: 100%; border-collapse: collapse; }
+      th { background: #f0fff4; font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.3px; padding: 6px 4px; border: 1px solid #1a1a1a; color: #1B4332; }
+      td { padding: 5px 4px; border: 1px solid #ddd; font-size: 10px; }
+      tr:nth-child(even) { background: #fafffe; }
+      
+      .summary-row { display: flex; border-top: 2px solid #1a1a1a; }
+      .gst-table { flex: 1; border-right: 2px solid #1a1a1a; }
+      .gst-table table { font-size: 9px; }
+      .gst-table th, .gst-table td { padding: 3px 6px; border: 1px solid #ccc; }
+      .amount-summary { flex: 1; padding: 4px 8px; }
+      .amount-row { display: flex; justify-content: space-between; padding: 2px 0; font-size: 10px; }
+      .amount-label { color: #555; }
+      .amount-value { font-weight: 700; text-align: right; }
+      .net-amount { font-size: 16px; font-weight: 900; color: #1B4332; border-top: 2px solid #1a1a1a; padding-top: 6px; margin-top: 4px; display: flex; justify-content: space-between; }
+      
+      .words-row { padding: 6px 8px; border-top: 1px solid #1a1a1a; font-size: 10px; font-weight: 600; background: #f8fffe; }
+      .footer { padding: 8px; border-top: 2px solid #1a1a1a; display: flex; justify-content: space-between; font-size: 9px; }
+      .terms { color: #666; line-height: 1.5; }
+      .signature { text-align: right; font-weight: 800; }
+      .totals-bar { display: flex; justify-content: space-between; padding: 6px 8px; border-top: 1px solid #1a1a1a; border-bottom: 1px solid #1a1a1a; font-size: 10px; font-weight: 700; background: #f0fff4; }
+    </style>
+  </head>
+  <body>
+    <div class="invoice-border">
+      <!-- HEADER -->
+      <div class="header-row">
+        <div class="company-section">
+          <div class="company-name">${COMPANY.name}</div>
+          <div class="company-addr">
+            ${COMPANY.address.replace(/\n/g, '<br/>')}
+            <br/>Mail: ${COMPANY.email}
+            <br/>Mobile: ${COMPANY.mobile}
+          </div>
+          <div class="company-gst">GST No: ${COMPANY.gstin} &nbsp;&nbsp; DL NO: ${COMPANY.dl_no}</div>
+        </div>
+        <div class="bank-section">
+          <div class="bank-title">BANK DETAILS</div>
+          <div class="bank-row"><span class="bank-label">Bank</span> <span>: ${COMPANY.bank.name}</span></div>
+          <div class="bank-row"><span class="bank-label">Branch</span> <span>: ${COMPANY.bank.branch}</span></div>
+          <div class="bank-row"><span class="bank-label">A/C NO</span> <span>: ${COMPANY.bank.ac_no}</span></div>
+          <div class="bank-row"><span class="bank-label">IFSC</span> <span>: ${COMPANY.bank.ifsc}</span></div>
+          <div style="text-align:center; margin-top:6px; font-weight:700; font-size:9px;">Q/R CODE</div>
+        </div>
+      </div>
+      
+      <!-- BUYER & INVOICE META -->
+      <div class="buyer-row">
+        <div class="buyer-section">
+          <strong style="font-size:12px;">${user.store_name || 'Customer'}</strong><br/>
+          ${user.address || 'Address not provided'}<br/>
+          Mob: ${user.phone || '-'}
+          ${user.drug_license ? '<br/>DL No: ' + user.drug_license : ''}
+          ${user.gst_number ? '<br/>GST No: <strong>' + user.gst_number + '</strong>' : ''}
+        </div>
+        <div class="buyer-section" style="border-right: none;">
+          <div class="invoice-title">GST Invoice</div>
+          <div style="padding: 4px;">
+            <span class="meta-label">Inv No</span> <span class="meta-value">: ${invoiceNo}</span><br/>
+            <span class="meta-label">Date</span> <span class="meta-value">: ${invoiceDate}</span><br/>
+            <span class="meta-label">Due Date</span> <span class="meta-value">: ${dueDate}</span><br/>
+            <span class="meta-label">Mobile</span> <span class="meta-value">: ${COMPANY.mobile}</span>
+          </div>
+        </div>
+      </div>
+      
+      <!-- ITEMS TABLE -->
+      <table>
+        <thead>
+          <tr>
+            <th>Sno</th><th>Product Name</th><th>Pack</th><th>Mfr</th><th>HSN</th><th>Batch</th><th>Exp</th><th>Qty</th><th>Free</th><th>MRP</th><th>Rate</th><th>Disc</th><th>GST%</th><th>Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${itemRows}
+        </tbody>
+      </table>
+      
+      <!-- TOTALS BAR -->
+      <div class="totals-bar">
+        <span>Total Items: ${order.items?.length || 0}</span>
+        <span>Total Qty: ${totalQty}</span>
+        <span>Total Outstandings: ₹${(user.credit_balance || 0).toFixed(2)}</span>
+      </div>
+      
+      <!-- GST BREAKDOWN + AMOUNT SUMMARY -->
+      <div class="summary-row">
+        <div class="gst-table">
+          <table>
+            <tr><th>Sales</th><th>GST-0%</th><th>GST-5%</th><th>GST-12%</th><th>GST-18%</th><th>GST-28%</th></tr>
+            <tr><td><strong>GST/IGST</strong></td><td></td><td>₹${taxableValue.toFixed(2)}</td><td></td><td></td><td></td></tr>
+            <tr><td><strong>GST TAX</strong></td><td></td><td>₹${gstAmount.toFixed(2)}</td><td></td><td></td><td></td></tr>
+            <tr><td><strong>CGST</strong></td><td></td><td>2.5% ₹${cgst.toFixed(2)}</td><td>6%</td><td>9%</td><td>14% 0.00</td></tr>
+            <tr><td><strong>SGST</strong></td><td></td><td>2.5% ₹${sgst.toFixed(2)}</td><td>6%</td><td>9%</td><td>14% 0.00</td></tr>
+          </table>
+        </div>
+        <div class="amount-summary">
+          <div class="amount-row"><span>Sub Total</span><span class="amount-value">₹${taxableValue.toFixed(2)}</span></div>
+          <div class="amount-row"><span>Discount</span><span class="amount-value">₹${discount.toFixed(2)}</span></div>
+          <div class="amount-row"><span>Tax Amount</span><span class="amount-value">₹${gstAmount.toFixed(2)}</span></div>
+          <div class="amount-row"><span>Freight</span><span class="amount-value">₹0.00</span></div>
+          <div class="amount-row"><span>Credit Not</span><span class="amount-value">₹0.00</span></div>
+          <div class="amount-row"><span>Debit Note</span><span class="amount-value">₹0.00</span></div>
+          <div class="amount-row"><span>Round off</span><span class="amount-value">₹${roundOff.toFixed(2)}</span></div>
+          <div class="net-amount"><span>Net Amount</span><span>₹${netAmount.toFixed(2)}</span></div>
+        </div>
+      </div>
+      
+      <!-- AMOUNT IN WORDS -->
+      <div class="words-row">
+        ${numberToWords(netAmount)}
+      </div>
+      
+      <!-- FOOTER -->
+      <div class="footer">
+        <div class="terms">
+          <strong>Terms & Conditions:</strong><br/>
+          1. Goods once sold will not be taken back.<br/>
+          2. Payment due strictly within 60 days of dispatch.<br/>
+          3. Late payments may incur penalties.
+        </div>
+        <div class="signature">
+          For <strong>${COMPANY.name}</strong>
+          <br/><br/><br/>
+          Authorised Signatory
+        </div>
+      </div>
+    </div>
+  </body>
+  </html>
+  `;
+};
+
+// Generate and share invoice PDF
+const handleInvoiceGenerate = async (order: any, user: any) => {
+  try {
+    const html = generateInvoiceHTML(order, user);
+    const { uri } = await Print.printToFileAsync({ html, width: 612, height: 792 });
+    await Sharing.shareAsync(uri, { UTI: '.pdf', mimeType: 'application/pdf' });
+  } catch (err) {
+    Alert.alert('Error', 'Could not generate invoice. Please try again.');
+  }
+};
+
 const useStore = create((set, get) => ({
   serverIp: DEFAULT_IP,
   setServerIp: (ip) => set({ serverIp: ip }),
@@ -147,8 +396,7 @@ const useStore = create((set, get) => ({
   getVerifyUrl: () => `http://${get().serverIp}:3000/api/auth/verify`,
   getSignupUrl: () => `http://${get().serverIp}:3000/api/auth/signup`,
   getSchemesUrl: () => `http://${get().serverIp}:3000/api/schemes`,
-
-  getTokenUrl: () => `http://${get().serverIp}:3000/api/user/token`,
+  getSchemesValidateUrl: () => `http://${get().serverIp}:3000/api/schemes/validate`,
 
   // Schemes / Coupons
   schemes: [],
@@ -218,12 +466,78 @@ const TN_DISTRICTS = [
   'Ariyalur', 'Chengalpattu', 'Chennai', 'Coimbatore', 'Cuddalore', 'Dharmapuri', 'Dindigul', 'Erode', 'Kallakurichi', 'Kancheepuram', 'Kanyakumari', 'Karur', 'Krishnagiri', 'Madurai', 'Mayiladuthurai', 'Nagapattinam', 'Namakkal', 'Nilgiris', 'Perambalur', 'Pudukkottai', 'Ramanathapuram', 'Ranipet', 'Salem', 'Sivaganga', 'Tenkasi', 'Thanjavur', 'Theni', 'Thoothukudi', 'Tiruchirappalli', 'Tirunelveli', 'Tirupattur', 'Tirupur', 'Tiruvallur', 'Tiruvannamalai', 'Vellore', 'Villupuram', 'Virudhunagar'
 ];
 
+// --- Premium Text Input ---
+const PremiumTextInput = ({ label, value, onChangeText, keyboardType = 'default', icon }) => {
+  const [isFocused, setIsFocused] = useState(false);
+  const animValue = useRef(new Animated.Value(value ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.timing(animValue, {
+      toValue: isFocused || value ? 1 : 0,
+      duration: 200,
+      useNativeDriver: false,
+    }).start();
+  }, [isFocused, value]);
+
+  const labelStyle = {
+    position: 'absolute',
+    left: 0,
+    top: animValue.interpolate({ inputRange: [0, 1], outputRange: [18, 6] }),
+    fontSize: animValue.interpolate({ inputRange: [0, 1], outputRange: [14, 10] }),
+    color: animValue.interpolate({ inputRange: [0, 1], outputRange: ['#64748b', BRAND[500]] }),
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  };
+
+  return (
+    <View style={{ marginBottom: 12 }}>
+      <View style={{ 
+        backgroundColor: '#0A1E13', 
+        borderRadius: 14, 
+        borderWidth: 1.5, 
+        borderColor: isFocused ? BRAND[500] : 'rgba(216, 243, 220, 0.05)',
+        height: 58,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 14,
+        ...(isFocused ? SHADOWS.glowGreen : {})
+      }}>
+        {icon && <Ionicons name={icon} size={18} color={isFocused ? BRAND[500] : '#475569'} style={{ marginRight: 12 }} />}
+        <View style={{ flex: 1, position: 'relative', height: '100%', justifyContent: 'center' }}>
+          <Animated.Text style={labelStyle}>{label}</Animated.Text>
+          <TextInput
+            style={{ color: '#fff', fontSize: 15, fontWeight: '700', height: '100%', paddingTop: 16, paddingBottom: 0 }}
+            value={value}
+            onChangeText={onChangeText}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            keyboardType={keyboardType}
+          />
+        </View>
+      </View>
+    </View>
+  );
+};
+
 // --- Signup Screen ---
 function SignupScreen({ setCurrentScreen }) {
   const [form, setForm] = useState({ phone: '', store_name: '', user_type: 'Retailer', drug_license: '', gst_number: '', registration_number: '', address: '', email: '', zone: 'Tamil Nadu', city: '' });
   const [isLoading, setIsLoading] = useState(false);
   const [showCityPicker, setShowCityPicker] = useState(false);
+  const [showConfig, setShowConfig] = useState(false);
+  const [tempIp, setTempIp] = useState('');
+  
+  const serverIp = useStore((state) => state.serverIp);
+  const setServerIp = useStore((state) => state.setServerIp);
   const getSignupUrl = useStore((state) => state.getSignupUrl);
+
+  // Entrance Animations
+  const boxAnims = [useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current];
+
+  useEffect(() => { 
+    setTempIp(serverIp); 
+    Animated.stagger(150, boxAnims.map(anim => Animated.spring(anim, { toValue: 1, useNativeDriver: true, tension: 50, friction: 8 }))).start();
+  }, [serverIp]);
 
   const handleSignup = async () => {
     if(!form.phone || !form.store_name) return Alert.alert('Error', 'Phone and Firm Name are required.');
@@ -249,68 +563,134 @@ function SignupScreen({ setCurrentScreen }) {
   };
 
   return (
-    <KeyboardAvoidingView style={styles.loginContainer} behavior={Platform.OS === "ios" ? "padding" : "height"}>
-      <ScrollView contentContainerStyle={{ flexGrow: 1, padding: 24, paddingTop: 60 }} keyboardShouldPersistTaps="handled">
-        <Text style={[styles.loginTitle, {color: '#fff'}]}>Register Firm</Text>
-        <Text style={[styles.loginSubtitle, {color: '#94a3b8'}]}>Join the B2B Command Network.</Text>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: '#05120B' }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+      <ScrollView contentContainerStyle={{ flexGrow: 1, padding: 20, paddingTop: 60 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         
-        <TextInput style={styles.inputFieldConfig} placeholder="Firm / Clinic Name" placeholderTextColor="#64748b" value={form.store_name} onChangeText={(t) => setForm({...form, store_name: t})} />
-        <TextInput style={[styles.inputFieldConfig, {marginTop: 12}]} placeholder="Phone Number" placeholderTextColor="#64748b" keyboardType="phone-pad" value={form.phone} onChangeText={(t) => setForm({...form, phone: t})} />
-        <TextInput style={[styles.inputFieldConfig, {marginTop: 12}]} placeholder="Email Address" placeholderTextColor="#64748b" keyboardType="email-address" value={form.email} onChangeText={(t) => setForm({...form, email: t})} />
-        
-        <Text style={{color: '#fff', marginTop: 20, marginBottom: 8, fontWeight: '700'}}>User Type</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom: 16}}>
-          {['Retailer', 'Clinic', 'Doctor', 'Doctor with Pharmacy'].map(type => (
-            <TouchableOpacity key={type} onPress={() => setForm({...form, user_type: type})} style={{padding: 12, backgroundColor: form.user_type === type ? BRAND[800] : '#1e293b', borderRadius: 12, marginRight: 8, borderWidth: form.user_type === type ? 1.5 : 0, borderColor: BRAND[500]}}>
-              <Text style={{color: '#fff', fontWeight: '600'}}>{type}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        {/* District Dropdown */}
-        <Text style={{color: '#fff', marginTop: 8, marginBottom: 8, fontWeight: '700'}}>State & District</Text>
-        <View style={[styles.inputFieldConfig, {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', opacity: 0.7}]}>
-          <Text style={{color: '#fff', fontSize: 15, fontWeight: '700'}}>{form.zone}</Text>
-          <Ionicons name="lock-closed" size={16} color="#64748b" />
+        {/* Hero Header */}
+        <View style={{ marginBottom: 32, alignItems: 'center' }}>
+          <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: BRAND[800], justifyContent: 'center', alignItems: 'center', marginBottom: 16, ...SHADOWS.glowGreen }}>
+            <Ionicons name="shield-checkmark" size={32} color="#fff" />
+          </View>
+          <Text style={{ fontSize: 32, fontWeight: '900', color: '#fff', letterSpacing: -1 }}>Register Firm</Text>
+          <Text style={{ fontSize: 14, color: '#94a3b8', fontWeight: '600', marginTop: 4, letterSpacing: 0.5, textTransform: 'uppercase' }}>Join the B2B Command Network</Text>
         </View>
-        <TouchableOpacity style={[styles.inputFieldConfig, {marginTop: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'}]} onPress={() => setShowCityPicker(true)}>
-          <Text style={{color: form.city ? '#fff' : '#64748b', fontSize: 15, fontWeight: form.city ? '700' : '400'}}>{form.city || 'Select District'}</Text>
-          <Ionicons name="chevron-down" size={18} color="#64748b" />
-        </TouchableOpacity>
 
-        {form.user_type !== 'Doctor' && <TextInput style={[styles.inputFieldConfig, {marginTop: 12}]} placeholder="Drug License Number" placeholderTextColor="#64748b" value={form.drug_license} onChangeText={(t) => setForm({...form, drug_license: t})} />}
-        {(form.user_type === 'Retailer' || form.user_type === 'Doctor with Pharmacy') && <TextInput style={[styles.inputFieldConfig, {marginTop: 12}]} placeholder="GST Number" placeholderTextColor="#64748b" value={form.gst_number} onChangeText={(t) => setForm({...form, gst_number: t})} />}
-        {form.user_type !== 'Retailer' && <TextInput style={[styles.inputFieldConfig, {marginTop: 12}]} placeholder="Registration Number" placeholderTextColor="#64748b" value={form.registration_number} onChangeText={(t) => setForm({...form, registration_number: t})} />}
-        <TextInput style={[styles.inputFieldConfig, {marginTop: 12}]} placeholder="Full Address" placeholderTextColor="#64748b" value={form.address} onChangeText={(t) => setForm({...form, address: t})} />
+        {/* Bento Box 1: Identity */}
+        <Animated.View style={{ opacity: boxAnims[0], transform: [{ translateY: boxAnims[0].interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }], backgroundColor: '#0D2A1B', borderRadius: 24, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(216, 243, 220, 0.1)' }}>
+          <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800', marginBottom: 16, letterSpacing: 1.5, textTransform: 'uppercase' }}>Identity</Text>
+          <PremiumTextInput label="Firm / Clinic Name" icon="business" value={form.store_name} onChangeText={(t) => setForm({...form, store_name: t})} />
+          <PremiumTextInput label="Phone Number" icon="call" keyboardType="phone-pad" value={form.phone} onChangeText={(t) => setForm({...form, phone: t})} />
+          <PremiumTextInput label="Email Address" icon="mail" keyboardType="email-address" value={form.email} onChangeText={(t) => setForm({...form, email: t})} />
+        </Animated.View>
 
-        <AnimatedPressable style={[styles.buttonPrimary, {marginTop: 24}]} onPress={handleSignup} disabled={isLoading}>
-          <Text style={styles.buttonPrimaryText}>{isLoading ? 'Submitting...' : 'Submit Application'}</Text>
+        {/* Bento Box 2: Role */}
+        <Animated.View style={{ opacity: boxAnims[1], transform: [{ translateY: boxAnims[1].interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }], backgroundColor: '#0D2A1B', borderRadius: 24, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(216, 243, 220, 0.1)' }}>
+          <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800', marginBottom: 16, letterSpacing: 1.5, textTransform: 'uppercase' }}>Select Role</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'space-between' }}>
+            {['Retailer', 'Clinic', 'Doctor', 'Pharmacy'].map(type => {
+              // Map 'Pharmacy' back to 'Doctor with Pharmacy' for data consistency
+              const actualType = type === 'Pharmacy' ? 'Doctor with Pharmacy' : type;
+              const isSelected = form.user_type === actualType;
+              return (
+                <TouchableOpacity 
+                  key={actualType} 
+                  onPress={() => { Haptics.selectionAsync(); setForm({...form, user_type: actualType}); }} 
+                  style={{
+                    width: '48%', 
+                    backgroundColor: isSelected ? BRAND[800] : '#0A1E13', 
+                    borderRadius: 16, 
+                    padding: 16, 
+                    borderWidth: 1.5, 
+                    borderColor: isSelected ? BRAND[500] : 'transparent',
+                    ...(isSelected ? SHADOWS.glowGreen : {})
+                  }}
+                  activeOpacity={0.9}
+                >
+                  <Ionicons name={type === 'Retailer' ? 'storefront' : type === 'Clinic' ? 'business' : type === 'Doctor' ? 'medkit' : 'fitness'} size={24} color={isSelected ? '#fff' : '#475569'} style={{marginBottom: 12}} />
+                  <Text style={{color: isSelected ? '#fff' : '#94a3b8', fontWeight: isSelected ? '800' : '600', fontSize: 13}}>{type}</Text>
+                  {isSelected && <View style={{ position: 'absolute', top: 12, right: 12 }}><Ionicons name="checkmark-circle" size={16} color="#fff" /></View>}
+                </TouchableOpacity>
+              )
+            })}
+          </View>
+        </Animated.View>
+
+        {/* Bento Box 3: Location */}
+        <Animated.View style={{ opacity: boxAnims[2], transform: [{ translateY: boxAnims[2].interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }], backgroundColor: '#0D2A1B', borderRadius: 24, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(216, 243, 220, 0.1)' }}>
+          <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800', marginBottom: 16, letterSpacing: 1.5, textTransform: 'uppercase' }}>Location</Text>
+          
+          <TouchableOpacity 
+            style={{ backgroundColor: '#0A1E13', borderRadius: 14, borderWidth: 1.5, borderColor: 'rgba(216, 243, 220, 0.05)', height: 58, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, marginBottom: 12 }}
+            onPress={() => { Haptics.selectionAsync(); setShowCityPicker(true); }}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="map" size={18} color={BRAND[500]} style={{ marginRight: 12 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: form.city ? '#fff' : '#64748b', fontSize: 15, fontWeight: '700' }}>{form.city || 'Select District'}</Text>
+              {form.city && <Text style={{ color: '#64748b', fontSize: 10, fontWeight: '800', marginTop: 2 }}>TAMIL NADU</Text>}
+            </View>
+            <Ionicons name="chevron-down" size={18} color="#475569" />
+          </TouchableOpacity>
+
+          <PremiumTextInput label="Full Delivery Address" icon="location" value={form.address} onChangeText={(t) => setForm({...form, address: t})} />
+        </Animated.View>
+
+        {/* Bento Box 4: Credentials */}
+        <Animated.View style={{ opacity: boxAnims[3], transform: [{ translateY: boxAnims[3].interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }], backgroundColor: '#0D2A1B', borderRadius: 24, padding: 20, marginBottom: 32, borderWidth: 1, borderColor: 'rgba(216, 243, 220, 0.1)' }}>
+          <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800', marginBottom: 16, letterSpacing: 1.5, textTransform: 'uppercase' }}>Compliance & Credentials</Text>
+          {form.user_type !== 'Doctor' && <PremiumTextInput label="Drug License Number" icon="document-text" value={form.drug_license} onChangeText={(t) => setForm({...form, drug_license: t})} />}
+          {(form.user_type === 'Retailer' || form.user_type === 'Doctor with Pharmacy') && <PremiumTextInput label="GST Number" icon="receipt" value={form.gst_number} onChangeText={(t) => setForm({...form, gst_number: t})} />}
+          {form.user_type !== 'Retailer' && <PremiumTextInput label="Registration Number" icon="shield-checkmark" value={form.registration_number} onChangeText={(t) => setForm({...form, registration_number: t})} />}
+        </Animated.View>
+
+        {/* Submit */}
+        <AnimatedPressable style={[styles.buttonPrimary, { marginBottom: 24, paddingVertical: 18, ...SHADOWS.glowGreen }]} onPress={handleSignup} disabled={isLoading}>
+          <Text style={[styles.buttonPrimaryText, { fontSize: 18 }]}>{isLoading ? 'Submitting...' : 'Submit Application'}</Text>
         </AnimatedPressable>
         
-        <TouchableOpacity style={{ marginTop: 20 }} onPress={() => setCurrentScreen('Login')}>
-          <Text style={styles.configText}>ALREADY REGISTERED? LOGIN</Text>
+        <TouchableOpacity style={{ alignItems: 'center', marginBottom: 12 }} onPress={() => setCurrentScreen('Login')}>
+          <Text style={{ color: '#64748b', fontWeight: '700', fontSize: 14 }}>Already registered? <Text style={{color: BRAND[500], fontWeight: '900'}}>Log In</Text></Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={{ alignItems: 'center', marginBottom: 40 }} onPress={() => setShowConfig(true)}>
+          <Text style={{ color: '#475569', fontWeight: '800', fontSize: 10, letterSpacing: 1 }}>NETWORK SETUP</Text>
         </TouchableOpacity>
 
         {/* City/District Picker Modal */}
         <Modal visible={showCityPicker} transparent animationType="slide">
           <View style={styles.modalOverlayBottom}>
-            <View style={[styles.bottomSheet, { maxHeight: '70%' }]}>
+            <View style={[styles.bottomSheet, { maxHeight: '70%', backgroundColor: '#0B2618', paddingBottom: 40 }]}>
               <View style={styles.dragHandle} />
-              <Text style={styles.modalTitle}>Select District</Text>
-              <Text style={{color: '#64748b', fontSize: 13, marginBottom: 16, fontWeight: '500'}}>{form.zone}</Text>
+              <Text style={[styles.modalTitle, { color: '#fff' }]}>Select District</Text>
+              <Text style={{color: BRAND[500], fontSize: 13, marginBottom: 16, fontWeight: '800', letterSpacing: 1}}>{form.zone.toUpperCase()}</Text>
               <ScrollView showsVerticalScrollIndicator={false}>
                 {TN_DISTRICTS.map(city => (
-                  <TouchableOpacity key={city} style={{ paddingVertical: 14, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: '#f1f5f9', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: form.city === city ? BRAND[50] : '#fff' }} onPress={() => { Haptics.selectionAsync(); setForm({...form, city}); setShowCityPicker(false); }}>
-                    <Text style={{fontSize: 15, fontWeight: form.city === city ? '800' : '500', color: form.city === city ? BRAND[800] : '#1A1A1A'}}>{city}</Text>
-                    {form.city === city && <Ionicons name="checkmark-circle" size={20} color={BRAND[800]} />}
+                  <TouchableOpacity key={city} style={{ paddingVertical: 16, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: '#1e293b', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: form.city === city ? BRAND[800] : 'transparent' }} onPress={() => { Haptics.selectionAsync(); setForm({...form, city}); setShowCityPicker(false); }}>
+                    <Text style={{fontSize: 16, fontWeight: form.city === city ? '900' : '600', color: form.city === city ? '#fff' : '#cbd5e1'}}>{city}</Text>
+                    {form.city === city && <Ionicons name="checkmark-circle" size={20} color="#fff" />}
                   </TouchableOpacity>
                 ))}
               </ScrollView>
-              <AnimatedPressable style={[styles.buttonPrimary, {marginTop: 16}]} onPress={() => setShowCityPicker(false)}>
-                <Text style={styles.buttonPrimaryText}>Close</Text>
+              <AnimatedPressable style={[styles.buttonPrimary, {marginTop: 16, backgroundColor: '#0A1E13', borderWidth: 1, borderColor: '#1e293b'}]} onPress={() => setShowCityPicker(false)}>
+                <Text style={[styles.buttonPrimaryText, { color: '#fff' }]}>Close</Text>
               </AnimatedPressable>
             </View>
           </View>
+        </Modal>
+
+        {/* Network Config Modal */}
+        <Modal visible={showConfig} transparent animationType="fade">
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Network Setup</Text>
+              <Text style={{ marginBottom: 20, color: '#64748b', fontSize: 14 }}>Enter the Next.js API IPv4 address.</Text>
+              <TextInput style={styles.inputFieldConfig} value={tempIp} onChangeText={setTempIp} placeholder="192.168.x.x" keyboardType="numbers-and-punctuation"/>
+              <View style={{ flexDirection: 'row', gap: 12, marginTop: 24 }}>
+                <TouchableOpacity onPress={() => setShowConfig(false)} style={styles.btnCancel}><Text style={{ fontWeight: '700', color: '#475569' }}>Cancel</Text></TouchableOpacity>
+                <TouchableOpacity onPress={() => { setServerIp(tempIp); setShowConfig(false); }} style={styles.btnSave}><Text style={{ color: '#fff', fontWeight: '800' }}>Save IP</Text></TouchableOpacity>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
         </Modal>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -318,13 +698,26 @@ function SignupScreen({ setCurrentScreen }) {
 }
 
 
-// --- Login Screen ---
+// --- Login Screen (Premium Animated) ---
 function LoginScreen({ setCurrentScreen }) {
   const [phone, setPhone] = useState('');
-  const [otp, setOtp] = useState('');
+  const [otpDigits, setOtpDigits] = useState(['', '', '', '']);
   const [otpSent, setOtpSent] = useState(false);
   const [showConfig, setShowConfig] = useState(false);
   const [tempIp, setTempIp] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Animation values
+  const logoScale = useRef(new Animated.Value(0)).current;
+  const logoOpacity = useRef(new Animated.Value(0)).current;
+  const titleOpacity = useRef(new Animated.Value(0)).current;
+  const titleTranslateY = useRef(new Animated.Value(20)).current;
+  const taglineOpacity = useRef(new Animated.Value(0)).current;
+  const cardTranslateY = useRef(new Animated.Value(100)).current;
+  const cardOpacity = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const otpBoxAnims = useRef([0,1,2,3].map(() => new Animated.Value(0))).current;
+  const otpInputRefs = useRef([]);
 
   const setUser = useStore((state) => state.setUser);
   const serverIp = useStore((state) => state.serverIp);
@@ -334,9 +727,68 @@ function LoginScreen({ setCurrentScreen }) {
 
   useEffect(() => { setTempIp(serverIp); }, [serverIp]);
 
+  // Entrance animation sequence
+  useEffect(() => {
+    Animated.sequence([
+      Animated.parallel([
+        Animated.spring(logoScale, { toValue: 1, useNativeDriver: true, tension: 50, friction: 7, delay: 200 }),
+        Animated.timing(logoOpacity, { toValue: 1, duration: 600, useNativeDriver: true, delay: 200 }),
+      ]),
+      Animated.parallel([
+        Animated.timing(titleOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
+        Animated.spring(titleTranslateY, { toValue: 0, useNativeDriver: true, tension: 80, friction: 12 }),
+      ]),
+      Animated.timing(taglineOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
+      Animated.parallel([
+        Animated.spring(cardTranslateY, { toValue: 0, useNativeDriver: true, tension: 40, friction: 9 }),
+        Animated.timing(cardOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
+      ]),
+    ]).start();
+
+    // Pulse loop for CTA button
+    const pulseLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.03, duration: 1200, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1200, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    );
+    pulseLoop.start();
+    return () => pulseLoop.stop();
+  }, []);
+
+  // Animate OTP boxes when OTP is sent
+  useEffect(() => {
+    if (otpSent) {
+      otpBoxAnims.forEach((anim, idx) => {
+        Animated.spring(anim, { toValue: 1, useNativeDriver: true, tension: 80, friction: 8, delay: idx * 100 }).start();
+      });
+    }
+  }, [otpSent]);
+
+  const handleOtpChange = (text, index) => {
+    const newDigits = [...otpDigits];
+    newDigits[index] = text;
+    setOtpDigits(newDigits);
+    // Auto-focus next
+    if (text && index < 3) {
+      otpInputRefs.current[index + 1]?.focus();
+    }
+    // Auto-submit on last digit
+    if (text && index === 3) {
+      Keyboard.dismiss();
+    }
+  };
+
+  const handleOtpKeyPress = (e, index) => {
+    if (e.nativeEvent.key === 'Backspace' && !otpDigits[index] && index > 0) {
+      otpInputRefs.current[index - 1]?.focus();
+    }
+  };
+
   const requestOtp = async () => {
-    Haptics.selectionAsync();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     if(phone.length < 10) return Alert.alert('Invalid', 'Enter valid 10-digit phone');
+    setIsLoading(true);
     try {
       const res = await fetch(getOtpUrl(), {
         method: 'POST',
@@ -344,13 +796,20 @@ function LoginScreen({ setCurrentScreen }) {
         body: JSON.stringify({ phone })
       });
       const data = await res.json();
-      if(data.success) setOtpSent(true);
+      if(data.success) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setOtpSent(true);
+      }
       else Alert.alert('Error', data.error || 'Failed to send OTP');
     } catch(e) { Alert.alert('Error', 'Network connection failed.'); }
+    setIsLoading(false);
   };
 
   const verifyOtp = async () => {
-    Haptics.selectionAsync();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    const otp = otpDigits.join('');
+    if (otp.length < 4) return Alert.alert('Error', 'Enter all 4 digits');
+    setIsLoading(true);
     try {
       const res = await fetch(getVerifyUrl(), {
         method: 'POST',
@@ -359,36 +818,42 @@ function LoginScreen({ setCurrentScreen }) {
       });
       const data = await res.json();
       if(data.success) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         setUser(data.user);
         setCurrentScreen('Home');
       } else if (data.pending) {
         setUser(data.user);
         setCurrentScreen('PendingApproval');
       } else {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         Alert.alert('Access Denied', data.error || 'Invalid OTP');
       }
     } catch(e) { Alert.alert('Error', 'Network connection failed.'); }
+    setIsLoading(false);
   };
 
   return (
     <KeyboardAvoidingView style={styles.loginContainer} behavior={Platform.OS === "ios" ? "padding" : "height"}>
       <StatusBar barStyle="light-content" />
       <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
+        {/* Animated Hero */}
         <View style={styles.loginHero}>
-          <View style={styles.logoContainer}>
+          <Animated.View style={[styles.logoContainer, { transform: [{ scale: logoScale }], opacity: logoOpacity }]}>
             <Image source={require('./assets/pharma_logo.jpeg')} style={styles.loginLogo} resizeMode="contain" />
-          </View>
-          <Text style={styles.companyName}>UPKEM LABS</Text>
-          <Text style={styles.tagline}>PHARMA · DISTRIBUTOR PORTAL</Text>
+          </Animated.View>
+          <Animated.Text style={[styles.companyName, { opacity: titleOpacity, transform: [{ translateY: titleTranslateY }] }]}>UPKEM LABS</Animated.Text>
+          <Animated.Text style={[styles.tagline, { opacity: taglineOpacity }]}>PHARMA · DISTRIBUTOR PORTAL</Animated.Text>
         </View>
 
-        <View style={styles.loginCard}>
+        {/* Animated Login Card */}
+        <Animated.View style={[styles.loginCard, { transform: [{ translateY: cardTranslateY }], opacity: cardOpacity }]}>
           <View style={styles.dragHandle} />
-          <Text style={styles.loginTitle}>{otpSent ? 'Enter the 4-digit code' : 'Sign in to your\ndistributor account.'}</Text>
-          <Text style={styles.loginSubtitle}>{otpSent ? `Sent to +91 ${phone} · ` : 'Enter the phone number registered with Upkem.\nWe\'ll send a 4-digit OTP.'}</Text>
+          <Text style={styles.loginTitle}>{otpSent ? 'Verify your\nidentity.' : 'Sign in to your\ndistributor account.'}</Text>
+          <Text style={styles.loginSubtitle}>{otpSent ? `4-digit code sent to +91 ${phone}` : 'Enter the phone number registered with Upkem.\nWe\'ll send a secure OTP.'}</Text>
+          
           {otpSent && (
-            <TouchableOpacity onPress={() => setOtpSent(false)}>
-              <Text style={{color: BRAND[800], fontWeight: '700', fontSize: 14, marginTop: -24, marginBottom: 24}}>Edit</Text>
+            <TouchableOpacity onPress={() => { setOtpSent(false); setOtpDigits(['','','','']); }} style={{ marginTop: -16, marginBottom: 20 }}>
+              <Text style={{color: BRAND[800], fontWeight: '800', fontSize: 14}}>← Change number</Text>
             </TouchableOpacity>
           )}
 
@@ -400,30 +865,72 @@ function LoginScreen({ setCurrentScreen }) {
                 <TextInput style={styles.inputField} placeholder="00000 00000" placeholderTextColor="#94a3b8" keyboardType="phone-pad" value={phone} onChangeText={setPhone} maxLength={10} returnKeyType="done" />
               </View>
               <Text style={{color: '#6B7280', fontSize: 13, marginBottom: 24, lineHeight: 20}}>By continuing you agree to Upkem's <Text style={{textDecorationLine: 'underline', fontWeight: '700'}}>Terms</Text> & <Text style={{textDecorationLine: 'underline', fontWeight: '700'}}>Privacy Policy</Text></Text>
-              <AnimatedPressable style={styles.buttonPrimary} onPress={requestOtp}>
-                <Text style={styles.buttonPrimaryText}>Send OTP  →</Text>
-              </AnimatedPressable>
+              <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+                <AnimatedPressable style={styles.buttonPrimary} onPress={requestOtp} disabled={isLoading}>
+                  <Text style={styles.buttonPrimaryText}>{isLoading ? 'Sending...' : 'Send OTP  →'}</Text>
+                </AnimatedPressable>
+              </Animated.View>
             </>
           ) : (
             <>
-              <TextInput style={[styles.inputFieldConfig, {marginBottom: 24, textAlign: 'center', fontSize: 24, letterSpacing: 8}]} placeholder="1234" keyboardType="number-pad" value={otp} onChangeText={setOtp} maxLength={4} />
-              <AnimatedPressable style={styles.buttonPrimary} onPress={verifyOtp}>
-                <Text style={styles.buttonPrimaryText}>Authenticate</Text>
+              {/* Individual OTP Boxes */}
+              <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 14, marginBottom: 32 }}>
+                {[0,1,2,3].map((idx) => (
+                  <Animated.View key={idx} style={{ 
+                    transform: [{ scale: otpBoxAnims[idx].interpolate({ inputRange: [0,1], outputRange: [0.5, 1] }) }],
+                    opacity: otpBoxAnims[idx],
+                  }}>
+                    <TextInput
+                      ref={ref => otpInputRefs.current[idx] = ref}
+                      style={{
+                        width: 60, height: 68, borderRadius: 20, textAlign: 'center',
+                        fontSize: 28, fontWeight: '900', color: '#1A1A1A',
+                        backgroundColor: otpDigits[idx] ? BRAND[50] : '#f8fafc',
+                        borderWidth: 2.5,
+                        borderColor: otpDigits[idx] ? BRAND[800] : '#e2e8f0',
+                      }}
+                      keyboardType="number-pad"
+                      maxLength={1}
+                      value={otpDigits[idx]}
+                      onChangeText={(t) => handleOtpChange(t, idx)}
+                      onKeyPress={(e) => handleOtpKeyPress(e, idx)}
+                      selectTextOnFocus
+                    />
+                  </Animated.View>
+                ))}
+              </View>
+              <AnimatedPressable style={styles.buttonPrimary} onPress={verifyOtp} disabled={isLoading}>
+                <Text style={styles.buttonPrimaryText}>{isLoading ? 'Verifying...' : 'Authenticate'}</Text>
               </AnimatedPressable>
-              <TouchableOpacity style={{ marginTop: 20 }} onPress={() => setOtpSent(false)}>
-                <Text style={styles.configText}>CHANGE NUMBER</Text>
+              <TouchableOpacity style={{ marginTop: 20, alignItems: 'center' }} onPress={requestOtp}>
+                <Text style={{color: '#64748b', fontWeight: '700', fontSize: 13}}>Didn't get the code? <Text style={{color: BRAND[800], fontWeight: '900'}}>Resend OTP</Text></Text>
               </TouchableOpacity>
             </>
           )}
 
-          <TouchableOpacity style={{ marginTop: 32 }} onPress={() => setCurrentScreen('Signup')}>
+          {/* Trust Badges */}
+          <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 20, marginTop: 32, paddingTop: 20, borderTopWidth: 1, borderTopColor: '#f1f5f9' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Ionicons name="shield-checkmark" size={14} color={BRAND[600]} />
+              <Text style={{ fontSize: 11, color: '#94a3b8', fontWeight: '700' }}>256-bit Encrypted</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Ionicons name="checkmark-circle" size={14} color={BRAND[600]} />
+              <Text style={{ fontSize: 11, color: '#94a3b8', fontWeight: '700' }}>UPKEM Verified</Text>
+            </View>
+          </View>
+
+          <TouchableOpacity style={{ marginTop: 24 }} onPress={() => setCurrentScreen('Signup')}>
             <Text style={styles.configText}>New distributor? <Text style={{color: BRAND[800], fontWeight: '900'}}>Request access</Text></Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={{ marginTop: 24 }} onPress={() => setShowConfig(true)}>
-            <Text style={styles.configText}>NETWORK CONFIGURATION</Text>
+          <TouchableOpacity style={{ marginTop: 20 }} onPress={() => setShowConfig(true)}>
+            <Text style={[styles.configText, { fontSize: 11 }]}>NETWORK CONFIGURATION</Text>
           </TouchableOpacity>
-        </View>
+
+          {/* Version badge */}
+          <Text style={{ textAlign: 'center', marginTop: 16, fontSize: 10, color: '#cbd5e1', fontWeight: '600' }}>v{APP_VERSION} · UPKEM LABS</Text>
+        </Animated.View>
 
         <Modal visible={showConfig} transparent animationType="fade">
           <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.modalOverlay}>
@@ -442,6 +949,7 @@ function LoginScreen({ setCurrentScreen }) {
     </KeyboardAvoidingView>
   );
 }
+
 // --- Pending Approval ---
 function PendingApprovalScreen({ setCurrentScreen }) {
   const setUser = useStore((state) => state.setUser);
@@ -489,7 +997,7 @@ const HOME_CATEGORIES = [
   { name: 'Ointments',        icon: 'color-fill-outline',      bg: BRAND[100] },
 ];
 
-function HomeScreen({ setCurrentScreen, onCategorySelect }) {
+function HomeScreen({ setCurrentScreen, onCategorySelect, onRefresh }) {
   const products = useStore((s) => s.products);
   const user = useStore((s) => s.user);
   const orders = useStore((s) => s.orders);
@@ -497,26 +1005,49 @@ function HomeScreen({ setCurrentScreen, onCategorySelect }) {
   const featured = products.slice(0, 8);
   const lastOrder = orders.length > 0 ? orders[0] : null;
   const availableCredit = user ? (user.credit_limit - user.credit_balance) : 0;
+  const [refreshing, setRefreshing] = useState(false);
+  const creditUtilization = user ? ((user.credit_balance || 0) / (user.credit_limit || 1)) * 100 : 0;
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    if (onRefresh) await onRefresh();
+    setTimeout(() => setRefreshing(false), 1000);
+  };
 
   return (
     <View style={styles.screen}>
       <StatusBar barStyle="dark-content" />
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
-        {/* Header */}
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={BRAND[800]} colors={[BRAND[800]]} />}>
+        {/* Header with greeting */}
         <View style={styles.homeHeader}>
           <View style={{flexDirection: 'row', alignItems: 'center'}}>
             <Image source={require('./assets/pharma_logo.jpeg')} style={styles.headerLogo} />
-            <Text style={{fontSize: 16, fontWeight: '900', color: BRAND[800], marginLeft: 10, letterSpacing: -0.3}}>UPKEM LABS</Text>
-          </View>
-          <View style={{flexDirection: 'row', alignItems: 'center', gap: 16}}>
-            <TouchableOpacity>
-              <Ionicons name="notifications-outline" size={24} color="#1A1A1A" />
-            </TouchableOpacity>
-            <View style={{width: 36, height: 36, borderRadius: 18, backgroundColor: BRAND[800], justifyContent: 'center', alignItems: 'center'}}>
-              <Text style={{color: '#fff', fontWeight: '800', fontSize: 14}}>{user?.store_name?.[0] || 'U'}</Text>
+            <View style={{marginLeft: 10}}>
+              <Text style={{fontSize: 12, color: '#6B7280', fontWeight: '600'}}>Good {getTimeOfDay()},</Text>
+              <Text style={{fontSize: 16, fontWeight: '900', color: BRAND[800], letterSpacing: -0.3}}>{user?.store_name || 'UPKEM LABS'}</Text>
             </View>
           </View>
+          <View style={{flexDirection: 'row', alignItems: 'center', gap: 16}}>
+            <TouchableOpacity onPress={() => setCurrentScreen('Orders')}>
+              <Ionicons name="notifications-outline" size={24} color="#1A1A1A" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setCurrentScreen('Profile')} style={{width: 36, height: 36, borderRadius: 18, backgroundColor: BRAND[800], justifyContent: 'center', alignItems: 'center'}}>
+              <Text style={{color: '#fff', fontWeight: '800', fontSize: 14}}>{user?.store_name?.[0] || 'U'}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
+
+        {/* Credit Health Banner */}
+        {creditUtilization > 75 && (
+          <TouchableOpacity onPress={() => setCurrentScreen('Profile')} style={{ marginHorizontal: 16, marginBottom: 12, backgroundColor: creditUtilization > 90 ? '#FEF2F2' : '#FFF7ED', padding: 14, borderRadius: 16, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: creditUtilization > 90 ? '#FEE2E2' : '#FED7AA' }} activeOpacity={0.85}>
+            <Ionicons name={creditUtilization > 90 ? 'warning' : 'alert-circle-outline'} size={20} color={creditUtilization > 90 ? '#DC2626' : '#EA580C'} style={{ marginRight: 10 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 13, fontWeight: '800', color: creditUtilization > 90 ? '#991B1B' : '#9A3412' }}>{creditUtilization > 90 ? 'Credit almost full' : 'Credit running low'}</Text>
+              <Text style={{ fontSize: 11, fontWeight: '600', color: creditUtilization > 90 ? '#B91C1C' : '#C2410C', marginTop: 1 }}>₹{availableCredit.toLocaleString('en-IN')} remaining · Tap to view payment options</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#D1D5DB" />
+          </TouchableOpacity>
+        )}
 
         {/* Search shortcut */}
         <TouchableOpacity style={styles.homeSearchBar} onPress={() => setCurrentScreen('Catalog')} activeOpacity={0.85}>
@@ -1150,8 +1681,10 @@ function ReviewConfirmScreen({ setCurrentScreen }) {
   const schemes = useStore((s) => s.schemes);
   const appliedCoupon = useStore((s) => s.appliedCoupon);
   const setAppliedCoupon = useStore((s) => s.setAppliedCoupon);
+  const getSchemesValidateUrl = useStore((s) => s.getSchemesValidateUrl);
   const [couponInput, setCouponInput] = useState('');
   const [couponError, setCouponError] = useState('');
+  const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
 
   const cartItems = Object.keys(cart).map(id => {
     const product = products.find(p => p.id === parseInt(id));
@@ -1195,6 +1728,7 @@ function ReviewConfirmScreen({ setCurrentScreen }) {
       items: cartItems,
       total: totalValue,
       subtotal: subtotal,
+      discount_value: Math.round(discountValue),
       gst: gst,
       status: 'Placed',
       scheme_code: appliedCoupon ? appliedCoupon.code : null,
@@ -1209,36 +1743,84 @@ function ReviewConfirmScreen({ setCurrentScreen }) {
     }
   };
 
-  // --- Order Success (Spec 15) ---
+  // --- Order Success (Spec 15 — Enhanced with Invoice) ---
   if (placedOrder) {
     return (
       <View style={styles.centeredContainer}>
-        <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: BRAND[800], justifyContent: 'center', alignItems: 'center', marginBottom: 24 }}>
-          <Ionicons name="checkmark" size={40} color="#fff" />
+        <StatusBar barStyle="dark-content" />
+        {/* Animated Success Circle */}
+        <View style={{ alignItems: 'center', marginBottom: 28 }}>
+          <View style={{ width: 100, height: 100, borderRadius: 50, backgroundColor: BRAND[50], justifyContent: 'center', alignItems: 'center', borderWidth: 3, borderColor: BRAND[100] }}>
+            <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: BRAND[800], justifyContent: 'center', alignItems: 'center', ...SHADOWS.glowGreen }}>
+              <Ionicons name="checkmark" size={40} color="#fff" />
+            </View>
+          </View>
         </View>
-        <Text style={{ fontSize: 28, fontWeight: '900', color: '#1A1A1A', marginBottom: 12, letterSpacing: -0.5 }}>Order placed!</Text>
-        <Text style={{ fontSize: 15, color: '#64748b', textAlign: 'center', lineHeight: 22, marginBottom: 32, paddingHorizontal: 24 }}>
-          Your order has been received. Our team will{'\n'}accept it shortly. You'll get an SMS update.
+        
+        <Text style={{ fontSize: 30, fontWeight: '900', color: '#1A1A1A', marginBottom: 8, letterSpacing: -0.5 }}>Order placed!</Text>
+        <Text style={{ fontSize: 15, color: '#64748b', textAlign: 'center', lineHeight: 22, marginBottom: 28, paddingHorizontal: 24 }}>
+          Your order has been received. Our team will{'\n'}review and accept it shortly.
         </Text>
-        <View style={{ backgroundColor: '#f8fafc', borderRadius: 16, padding: 20, flexDirection: 'row', justifyContent: 'space-between', width: '85%', marginBottom: 16, borderWidth: 1, borderColor: '#e2e8f0' }}>
-          <View>
-            <Text style={{ fontSize: 11, fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5 }}>Order ID</Text>
-            <Text style={{ fontSize: 18, fontWeight: '900', color: '#1A1A1A', marginTop: 4 }}>{placedOrder.id}</Text>
+        
+        {/* Order Summary Card */}
+        <View style={{ backgroundColor: '#fff', borderRadius: 20, padding: 20, width: '90%', marginBottom: 20, borderWidth: 1, borderColor: '#f1f5f9', ...SHADOWS.sm }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
+            <View>
+              <Text style={{ fontSize: 10, fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5 }}>Order ID</Text>
+              <Text style={{ fontSize: 20, fontWeight: '900', color: '#1A1A1A', marginTop: 2 }}>{placedOrder.id}</Text>
+            </View>
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text style={{ fontSize: 10, fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5 }}>Net Amount</Text>
+              <Text style={{ fontSize: 20, fontWeight: '900', color: BRAND[800], marginTop: 2 }}>₹{placedOrder.total.toLocaleString('en-IN')}</Text>
+            </View>
           </View>
-          <View style={{ alignItems: 'flex-end' }}>
-            <Text style={{ fontSize: 11, fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5 }}>Total</Text>
-            <Text style={{ fontSize: 18, fontWeight: '900', color: '#1A1A1A', marginTop: 4 }}>₹{placedOrder.total.toLocaleString('en-IN')}</Text>
+          <View style={{ backgroundColor: '#f8fafc', borderRadius: 12, padding: 12, flexDirection: 'row', justifyContent: 'space-between' }}>
+            <Text style={{ fontSize: 12, color: '#64748b', fontWeight: '600' }}>{placedOrder.items?.length || 0} items</Text>
+            <Text style={{ fontSize: 12, color: '#64748b', fontWeight: '600' }}>GST: ₹{(placedOrder.gst || 0).toLocaleString('en-IN')}</Text>
+            <Text style={{ fontSize: 12, color: '#64748b', fontWeight: '600' }}>Credit: 60 days</Text>
           </View>
         </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 32 }}>
-          <Ionicons name="checkmark-circle" size={16} color={BRAND[500]} />
-          <Text style={{ color: '#64748b', fontSize: 13, fontWeight: '600', marginLeft: 6 }}>Invoice sent to WhatsApp</Text>
-        </View>
-        <View style={{ flexDirection: 'row', gap: 12, width: '85%' }}>
-          <TouchableOpacity style={{ flex: 1, borderWidth: 1.5, borderColor: BRAND[800], borderRadius: 16, paddingVertical: 16, alignItems: 'center' }} onPress={() => setCurrentScreen('Orders')}>
-            <Text style={{ color: BRAND[800], fontWeight: '800', fontSize: 15 }}>View orders</Text>
+
+        {/* Invoice Actions */}
+        <View style={{ width: '90%', marginBottom: 16 }}>
+          <TouchableOpacity 
+            style={{ backgroundColor: BRAND[50], borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: BRAND[100], marginBottom: 10 }}
+            onPress={() => handleInvoiceGenerate(placedOrder, user)}
+          >
+            <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: BRAND[800], justifyContent: 'center', alignItems: 'center', marginRight: 14 }}>
+              <Ionicons name="document-text" size={20} color="#fff" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 15, fontWeight: '800', color: BRAND[800] }}>Download GST Invoice</Text>
+              <Text style={{ fontSize: 12, color: BRAND[600], fontWeight: '500', marginTop: 1 }}>PDF with full GST breakdown · Share via WhatsApp</Text>
+            </View>
+            <Ionicons name="download-outline" size={22} color={BRAND[800]} />
           </TouchableOpacity>
-          <TouchableOpacity style={{ flex: 1, backgroundColor: BRAND[800], borderRadius: 16, paddingVertical: 16, alignItems: 'center' }} onPress={() => setCurrentScreen('Home')}>
+        </View>
+
+        {/* Next Steps */}
+        <View style={{ width: '90%', backgroundColor: '#f8fafc', borderRadius: 14, padding: 14, marginBottom: 24 }}>
+          <Text style={{ fontSize: 10, fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>What happens next</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+            <Ionicons name="checkmark-circle" size={14} color={BRAND[500]} style={{ marginRight: 8 }} />
+            <Text style={{ fontSize: 12, color: '#475569', fontWeight: '600' }}>Admin reviews & accepts your order</Text>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+            <Ionicons name="cube-outline" size={14} color="#94a3b8" style={{ marginRight: 8 }} />
+            <Text style={{ fontSize: 12, color: '#475569', fontWeight: '600' }}>Order is packed & dispatched</Text>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Ionicons name="notifications-outline" size={14} color="#94a3b8" style={{ marginRight: 8 }} />
+            <Text style={{ fontSize: 12, color: '#475569', fontWeight: '600' }}>You'll receive SMS updates at each stage</Text>
+          </View>
+        </View>
+
+        {/* Action Buttons */}
+        <View style={{ flexDirection: 'row', gap: 12, width: '90%' }}>
+          <TouchableOpacity style={{ flex: 1, borderWidth: 1.5, borderColor: BRAND[800], borderRadius: 16, paddingVertical: 16, alignItems: 'center' }} onPress={() => setCurrentScreen('Orders')}>
+            <Text style={{ color: BRAND[800], fontWeight: '800', fontSize: 15 }}>Track order</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={{ flex: 1, backgroundColor: BRAND[800], borderRadius: 16, paddingVertical: 16, alignItems: 'center', ...SHADOWS.glowGreen }} onPress={() => setCurrentScreen('Home')}>
             <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>Continue</Text>
           </TouchableOpacity>
         </View>
@@ -1310,38 +1892,44 @@ function ReviewConfirmScreen({ setCurrentScreen }) {
                   autoCapitalize="characters"
                 />
                 <TouchableOpacity
-                  style={{ backgroundColor: couponInput.trim() ? BRAND[800] : '#e2e8f0', paddingHorizontal: 20, paddingVertical: 14, borderRadius: 12, marginLeft: 12 }}
-                  disabled={!couponInput.trim()}
-                  onPress={() => {
+                  style={{ backgroundColor: couponInput.trim() && !isApplyingCoupon ? BRAND[800] : '#e2e8f0', paddingHorizontal: 20, paddingVertical: 14, borderRadius: 12, marginLeft: 12 }}
+                  disabled={!couponInput.trim() || isApplyingCoupon}
+                  onPress={async () => {
                     Haptics.selectionAsync();
                     const code = couponInput.trim();
                     if (!code) return;
-                    const scheme = schemes?.find(s => s.code === code && s.is_active);
-                    if (!scheme) {
-                      setCouponError('Invalid or inactive scheme code.');
-                      return;
-                    }
-                    if (scheme.min_order_value && subtotal < scheme.min_order_value) {
-                      setCouponError(`Min. order value of ₹${scheme.min_order_value.toLocaleString('en-IN')} required.`);
-                      return;
-                    }
-                    if (scheme.usage_limit > 0 && scheme.times_used >= scheme.usage_limit) {
-                      setCouponError('This scheme code has reached its global usage limit.');
-                      return;
-                    }
-                    if (scheme.per_user_limit > 0) {
-                      const userUsageCount = pastOrders.filter(o => o.scheme_code === scheme.code).length;
-                      if (userUsageCount >= scheme.per_user_limit) {
-                        setCouponError(`You have reached the limit of ${scheme.per_user_limit} uses for this coupon.`);
-                        return;
-                      }
-                    }
-                    setAppliedCoupon(scheme);
-                    setCouponInput('');
+                    
+                    setIsApplyingCoupon(true);
                     setCouponError('');
+                    
+                    try {
+                      const res = await fetch(getSchemesValidateUrl(), {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                          code: code, 
+                          user_phone: user.phone, 
+                          order_subtotal: subtotal 
+                        })
+                      });
+                      
+                      const data = await res.json();
+                      if (data.success && data.scheme) {
+                        setAppliedCoupon(data.scheme);
+                        setCouponInput('');
+                      } else {
+                        setCouponError(data.error || 'Invalid or inactive scheme code.');
+                      }
+                    } catch (err) {
+                      setCouponError('Network error while validating coupon.');
+                    } finally {
+                      setIsApplyingCoupon(false);
+                    }
                   }}
                 >
-                  <Text style={{ color: couponInput.trim() ? '#fff' : '#94a3b8', fontWeight: '800', fontSize: 14 }}>Apply</Text>
+                  <Text style={{ color: couponInput.trim() && !isApplyingCoupon ? '#fff' : '#94a3b8', fontWeight: '800', fontSize: 14 }}>
+                    {isApplyingCoupon ? 'Wait..' : 'Apply'}
+                  </Text>
                 </TouchableOpacity>
               </View>
               {couponError ? <Text style={{ color: '#dc2626', fontSize: 12, fontWeight: '600', marginTop: 8, marginLeft: 4 }}>{couponError}</Text> : null}
@@ -1644,55 +2232,14 @@ function ProfileScreen({ setCurrentScreen }) {
       { text: "Logout", style: "destructive", onPress: () => {
         setUser(null);
         clearCart();
+        useStore.getState().clearCoupon();
         setCurrentScreen('Login');
       }}
     ]);
   };
 
-  const generateInvoice = async (order) => {
-    const html = `
-      <html>
-        <head>
-          <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; padding: 40px; color: #1A1A1A; }
-            h1 { color: #1B4332; margin-bottom: 0; font-size: 32px; letter-spacing: -1px; }
-            .header { border-bottom: 2px solid #D8F3DC; padding-bottom: 24px; margin-bottom: 32px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 24px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
-            th, td { border-bottom: 1px solid #f1f5f9; padding: 16px 20px; text-align: left; }
-            th { background: #F0FFF4; font-weight: 700; color: #1B4332; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; }
-            .total { text-align: right; font-size: 28px; font-weight: 900; margin-top: 32px; color: #1B4332; letter-spacing: -0.5px; }
-            .tagline { color: #1B4332; font-weight: 700; margin-top: 4px; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; }
-            .meta { color: #64748b; font-size: 14px; margin-top: 12px; line-height: 1.6; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h1>UPKEM LABS</h1>
-            <p class="tagline">Commercial Tax Invoice</p>
-            <div class="meta" style="margin-top: 32px;">
-              <p><strong>Order Ref:</strong> ${order.id}</p>
-              <p><strong>Generated On:</strong> ${order.date}</p>
-              <p><strong>Billed To:</strong> ${user.store_name} (+91 ${user.phone})</p>
-            </div>
-          </div>
-          <table>
-            <tr><th>Description</th><th>Qty</th><th>Unit Price</th><th>Amount</th></tr>
-            ${order.items.map(i => `<tr><td><strong style="color: #1A1A1A;">${i.name}</strong><br/><span style="font-size: 12px; color: #64748b;">${i.company} | ${i.category}</span></td><td>${i.quantity}</td><td>₹${i.price}</td><td><strong style="color: #1A1A1A;">₹${i.price * i.quantity}</strong></td></tr>`).join('')}
-          </table>
-          <div class="total">Net Payable: ₹${order.total.toLocaleString('en-IN')}</div>
-          <p style="margin-top: 60px; font-size: 12px; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 16px;">
-            Terms: Payment due strictly within 60 days of dispatch. Late payments may incur penalties. Digital copy.
-          </p>
-        </body>
-      </html>
-    `;
-    try {
-      const { uri } = await Print.printToFileAsync({ html });
-      await Sharing.shareAsync(uri, { UTI: '.pdf', mimeType: 'application/pdf' });
-    } catch (err) {
-      Alert.alert('Error', 'Could not generate invoice.');
-    }
-  };
+  const creditUtilization = ((user.credit_balance || 0) / (user.credit_limit || 1)) * 100;
+  const creditColor = creditUtilization > 90 ? '#ef4444' : creditUtilization > 60 ? '#f59e0b' : BRAND[600];
 
   const pendingDues = user.credit_balance || 0;
   const [showAddressModal, setShowAddressModal] = useState(false);
@@ -1821,7 +2368,7 @@ function ProfileScreen({ setCurrentScreen }) {
           </View>
         </View>
 
-        {/* Credit Summary */}
+        {/* Credit Summary — Enhanced */}
         <Text style={{ fontSize: 11, fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>Credit</Text>
         <View style={{ backgroundColor: '#fff', borderRadius: 16, marginBottom: 24, padding: 16, borderWidth: 1, borderColor: '#f1f5f9' }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
@@ -1836,15 +2383,61 @@ function ProfileScreen({ setCurrentScreen }) {
             <Text style={{ fontSize: 14, color: '#64748b', fontWeight: '500' }}>Available</Text>
             <Text style={{ fontSize: 14, color: BRAND[700], fontWeight: '800' }}>₹{((user.credit_limit || 0) - (user.credit_balance || 0)).toLocaleString('en-IN')}</Text>
           </View>
-          <View style={{ height: 6, backgroundColor: '#f1f5f9', borderRadius: 3, marginTop: 12, overflow: 'hidden' }}>
-            <View style={{ height: 6, backgroundColor: (user.credit_balance / (user.credit_limit || 1)) > 0.9 ? '#ef4444' : BRAND[600], borderRadius: 3, width: `${Math.min(((user.credit_balance || 0) / (user.credit_limit || 1)) * 100, 100)}%` }} />
+          <View style={{ height: 8, backgroundColor: '#f1f5f9', borderRadius: 4, marginTop: 14, overflow: 'hidden' }}>
+            <View style={{ height: 8, backgroundColor: creditColor, borderRadius: 4, width: `${Math.min(creditUtilization, 100)}%` }} />
           </View>
+          <Text style={{ fontSize: 11, color: '#94a3b8', fontWeight: '600', marginTop: 6, textAlign: 'right' }}>{Math.round(creditUtilization)}% utilized · 60 day terms</Text>
+        </View>
+
+        {/* Removed Make Payment / Bank Details from Profile as per Spec */}
+        {/* Invoices List */}
+        {orders.length > 0 && (
+          <>
+            <Text style={{ fontSize: 11, fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>Invoices</Text>
+            <View style={{ backgroundColor: '#fff', borderRadius: 16, marginBottom: 24, borderWidth: 1, borderColor: '#f1f5f9' }}>
+              {orders.slice(0, 5).map((order, idx) => (
+                <TouchableOpacity
+                  key={order.id}
+                  style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: idx < Math.min(orders.length, 5) - 1 ? 1 : 0, borderBottomColor: '#f1f5f9' }}
+                  onPress={() => handleInvoiceGenerate(order, user)}
+                >
+                  <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: BRAND[50], justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
+                    <Ionicons name="document-text-outline" size={17} color={BRAND[700]} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: '#1A1A1A' }}>{order.id}</Text>
+                    <Text style={{ fontSize: 12, color: '#94a3b8', fontWeight: '500' }}>{order.date} · ₹{order.total?.toLocaleString('en-IN')}</Text>
+                  </View>
+                  <Ionicons name="download-outline" size={18} color={BRAND[600]} />
+                </TouchableOpacity>
+              ))}
+            </View>
+          </>
+        )}
+
+        {/* Quick Actions */}
+        <Text style={{ fontSize: 11, fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>Quick Actions</Text>
+        <View style={{ flexDirection: 'row', gap: 10, marginBottom: 24 }}>
+          <TouchableOpacity onPress={() => setCurrentScreen('Orders')} style={{ flex: 1, backgroundColor: '#fff', borderRadius: 16, padding: 16, alignItems: 'center', borderWidth: 1, borderColor: '#f1f5f9' }}>
+            <Ionicons name="receipt-outline" size={22} color={BRAND[700]} style={{ marginBottom: 6 }} />
+            <Text style={{ fontSize: 12, fontWeight: '700', color: '#1A1A1A' }}>Order History</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => { Haptics.selectionAsync(); Alert.alert('Support', 'Call: ' + COMPANY.mobile + '\nEmail: ' + COMPANY.email); }} style={{ flex: 1, backgroundColor: '#fff', borderRadius: 16, padding: 16, alignItems: 'center', borderWidth: 1, borderColor: '#f1f5f9' }}>
+            <Ionicons name="call-outline" size={22} color={BRAND[700]} style={{ marginBottom: 6 }} />
+            <Text style={{ fontSize: 12, fontWeight: '700', color: '#1A1A1A' }}>Contact Rep</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Logout */}
         <TouchableOpacity onPress={handleLogout} style={{ paddingVertical: 16, alignItems: 'center', marginTop: 8 }}>
           <Text style={{ color: '#dc2626', fontWeight: '800', fontSize: 15 }}>Sign out</Text>
         </TouchableOpacity>
+
+        {/* App Info */}
+        <View style={{ alignItems: 'center', marginTop: 20, marginBottom: 20 }}>
+          <Text style={{ fontSize: 10, color: '#cbd5e1', fontWeight: '600' }}>v{APP_VERSION} · {COMPANY.brand}</Text>
+          <Text style={{ fontSize: 10, color: '#e2e8f0', fontWeight: '500', marginTop: 2 }}>GSTIN: {COMPANY.gstin}</Text>
+        </View>
       </ScrollView>
 
       {/* Address Modal */}
@@ -1950,6 +2543,7 @@ export default function App() {
             <HomeScreen
               setCurrentScreen={setCurrentScreen}
               onCategorySelect={setCatalogInitialCategory}
+              onRefresh={fetchAPI}
             />
           )}
           {currentScreen === 'Catalog' && (

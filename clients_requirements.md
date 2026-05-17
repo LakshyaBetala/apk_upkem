@@ -1,7 +1,7 @@
 Core Business Requirements
 	•	Private app for existing medical store customers only and future customers
 	•	Admin approval required for access
-	•	Minimum order value: ₹2000
+	•	Minimum order value: ₹2500
 	•	Catalog size: 3000–4000 SKUs
 	•	Users: 50–100 initially → scalable to ~1000
 
